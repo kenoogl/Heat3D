@@ -2,7 +2,7 @@ using Printf
 using Plots
 
 const EPS = 1.0e-5
-const ITER_MAX = 20
+const ITER_MAX = 1000
 
 """
     stretch(x1, x2, sp1, sp2, numNodes; debug=false)

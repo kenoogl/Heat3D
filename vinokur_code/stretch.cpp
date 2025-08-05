@@ -22,7 +22,7 @@
 #include "stretch.h"
 
 #define EPS 1.0e-5
-#define ITER_MAX 20
+#define ITER_MAX 1000
 
 
 // @brief 格子分布を反復的に求める

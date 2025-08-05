@@ -4,19 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。主にJuliaで実装されており、熱伝導方程式の数値解法を複数のアルゴリズムで提供します。
+Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。主にJuliaで実装されており、熱伝導方程式の数値解法を複数のアルゴリズムで提供します。Vinokurストレッチング関数のJulia実装も含まれています。
 
 ## Core Architecture
 
 ### ディレクトリ構成
 - `base/`: 基本的な数値解法アルゴリズム（SOR、BiCGSTAB）
 - `q3d/`: 3次元四層構造の熱解析モデル
-- `vinokur_code/`: C++実装の格子生成コード
+- `Vinokur_Julia/`: Vinokurストレッチング関数のJulia実装
+- `vinokur_code/`: C++実装の格子生成コード（元実装）
 
 ### 主要な数値解法
 1. **SOR法** (Successive Over-Relaxation): `heat3d.jl`
 2. **BiCGSTAB法** (Bi-Conjugate Gradient Stabilized): `pbicgstab.jl`
 3. **Red-Black SOR**: 並列化対応のSOR法
+4. **Vinokurストレッチング関数**: 格子点分布計算（Julia実装）
 
 ### データ構造
 - `Array{Float64,3}`: 3次元温度場、物性値配列
@@ -31,13 +33,15 @@ Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。�
 julia base/heat3d.jl          # 基本的な熱拡散計算
 julia base/heat3d_bicg.jl     # BiCGSTAB法による計算
 julia q3d/modelA.jl           # 3次元四層モデルの実行
+julia Vinokur_Julia/test_stretch.jl    # Vinokurストレッチング関数テスト
+julia vinokur_timing/benchmark.jl       # C++とJuliaの性能比較
 ```
 
 ### C++コンパイル（格子生成）
 ```bash
 cd vinokur_code
-make                          # pgc++コンパイラを使用
-./test                        # 実行
+make CXX=g++                  # g++コンパイラを使用（推奨）
+./test 101 0.0 1.0 0.01 0.01  # 実行例（101ノード、均等分布）
 make clean                    # クリーンアップ
 ```
 
@@ -77,6 +81,11 @@ make clean                    # クリーンアップ
 - `genZ!()`: Z方向非等間隔格子生成
 - `model_test()`: 統合テスト実行
 
+### Vinokurストレッチング関数（Vinokur_Julia/）
+- `stretch()`: 格子点分布計算（Julia実装）
+- `stretching!()`: 内部ストレッチング計算
+- `plot_grid_distribution()`: 格子分布可視化
+
 ## Testing and Visualization
 
 ### プロット出力
@@ -87,3 +96,37 @@ make clean                    # クリーンアップ
 ### 収束判定
 - 相対残差: `tol = 1.0e-8`
 - 最大反復数: `ItrMax = 5000-8000`
+- Vinokurストレッチング: `EPS = 1.0e-5`, `ITER_MAX = 1000`
+
+## Performance Comparison
+
+### C++ vs Julia ベンチマーク結果（Vinokurストレッチング関数）
+
+**実行時間比較（均等分布格子）:**
+
+| ノード数 | C++時間 | Julia時間 | 速度比 |
+|---------|---------|-----------|--------|
+| 51      | 3.4ms   | 0.001ms   | 3,400x |
+| 101     | 1.7ms   | 0.001ms   | 1,700x |
+| 201     | 1.2ms   | 0.001ms   | 1,200x |
+| 501     | 1.2ms   | 0.005ms   | 240x   |
+
+**詳細分析（101ノード）:**
+- Julia平均: 0.0003ms（300ナノ秒）
+- C++平均: 1.231ms
+- **総合速度比: Juliaが4,364倍高速**
+
+**メモリ効率:**
+- Juliaメモリ使用量: 5.34 KB（201ノード）
+- アロケーション回数: 4回
+
+## Dependencies
+
+### Julia Packages
+- `Printf`: 出力フォーマット
+- `Plots`: 可視化
+- `BenchmarkTools`: 性能測定（ベンチマーク用）
+
+### C++ Requirements
+- g++コンパイラ（pgc++から変更推奨）
+- 数学ライブラリ（標準）
