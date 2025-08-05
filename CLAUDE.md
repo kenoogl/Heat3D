@@ -1,0 +1,89 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。主にJuliaで実装されており、熱伝導方程式の数値解法を複数のアルゴリズムで提供します。
+
+## Core Architecture
+
+### ディレクトリ構成
+- `base/`: 基本的な数値解法アルゴリズム（SOR、BiCGSTAB）
+- `q3d/`: 3次元四層構造の熱解析モデル
+- `vinokur_code/`: C++実装の格子生成コード
+
+### 主要な数値解法
+1. **SOR法** (Successive Over-Relaxation): `heat3d.jl`
+2. **BiCGSTAB法** (Bi-Conjugate Gradient Stabilized): `pbicgstab.jl`
+3. **Red-Black SOR**: 並列化対応のSOR法
+
+### データ構造
+- `Array{Float64,3}`: 3次元温度場、物性値配列
+- `SZ`: 配列サイズ `(nx, ny, nz)`
+- `Δh`: 格子間隔 `(dx, dy, dz)`
+- `ox`: 原点座標 `(x0, y0, z0)`
+
+## Development Commands
+
+### Julia実行
+```bash
+julia base/heat3d.jl          # 基本的な熱拡散計算
+julia base/heat3d_bicg.jl     # BiCGSTAB法による計算
+julia q3d/modelA.jl           # 3次元四層モデルの実行
+```
+
+### C++コンパイル（格子生成）
+```bash
+cd vinokur_code
+make                          # pgc++コンパイラを使用
+./test                        # 実行
+make clean                    # クリーンアップ
+```
+
+## Code Conventions
+
+### Julia
+- 関数名: snake_case（例: `boundary_condition!`）
+- 配列操作: in-place更新には`!`を付与
+- インデントは2スペース
+- 物理パラメータは`const`で定義
+
+### 物性値設定
+材料IDによる物性値管理：
+- ID=1: 銅（TSV）
+- ID=2: シリコン
+- ID=3: はんだ（bump）
+- ID=4: PCB基板（FR4）
+- ID=5: ヒートシンク（A1060）
+- ID=6: アンダーフィル樹脂
+- ID=7: 電源グリッド
+
+### 境界条件
+- ディリクレ境界: `mask=0.0`、温度固定
+- ノイマン境界: `λ=0.0`、断熱条件
+
+## Key Functions
+
+### 基本計算関数（base/）
+- `sor!()`: SOR法による反復計算
+- `rbsor!()`: Red-Black SOR法
+- `residual()`: 残差計算
+- `boundary_condition!()`: 境界条件設定
+
+### 3次元モデル関数（q3d/）
+- `fillID!()`: 材料ID配列の生成
+- `setLambda!()`: 物性値配列の設定
+- `genZ!()`: Z方向非等間隔格子生成
+- `model_test()`: 統合テスト実行
+
+## Testing and Visualization
+
+### プロット出力
+- `plot_slice()`: 断面可視化
+- `id_xy()`, `id_yz()`: 材料分布可視化
+- 出力形式: PNG画像
+
+### 収束判定
+- 相対残差: `tol = 1.0e-8`
+- 最大反復数: `ItrMax = 5000-8000`
