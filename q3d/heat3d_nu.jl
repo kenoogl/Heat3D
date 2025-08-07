@@ -1,14 +1,15 @@
 using Printf
-using Plots
 using Random
 using LinearAlgebra
 
-const ItrMax = 8000
+include("heat3d_Cartesian.jl")
+
 const ω      = 1.0
-const tol    = 1.0e-8
 
-include("pbicgstab.jl")
 
+#include("../base/pbicgstab.jl")
+#
+include("plotter.jl")
 
 #=
 @brief マスク指定
@@ -51,7 +52,7 @@ end
 @brief 熱伝導率の設定 例題2 5分割
 @param [in]     λ      熱伝導率
 @param [in]     SZ     配列長
-=#
+
 function setMat_2!(λ::Array{Float64,3}, SZ)
 
     d = div(SZ[1]-2, 5)
@@ -88,57 +89,7 @@ end
 function setMat_3!(λ::Array{Float64,3}, SZ)
     copy!(λ, rand(SZ[1], SZ[2], SZ[3]) .* 50.0)
 end
-
-
-#=
-@brief 厳密解
-@param [in]     e      解ベクトル
-@param [in]     SZ     配列長
-@param [in]     Δh     セル幅
 =#
-function exact_solution!(e::Array{Float64,3}, SZ, Δh)
-    r2 = sqrt(2.0)
-    ox = (0.0, 0.0, 0.0)
-
-    for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
-        x = ox[1] + Δh[1]*(i-1.5)
-        y = ox[2] + Δh[2]*(j-1.5)
-        z = ox[3] + Δh[3]*(k-1.5)
-        e[i,j,k] = sin(π*x)*sin(π*y) / sinh(π*r2) * ( sinh(r2*π*z)-sinh(π*r2*(z-1.0)) )
-    end
-end
-
-
-#=
-@brief XZ断面（内部セル）
-@param [in]     ｄ      解ベクトル
-@param [in]     SZ     配列長
-@param [in]     fname  ファイル名
-=#
-function plot_slice(d::Array{Float64,3}, SZ, fname)
-    j = div(SZ[2],2)
-    s = d[2:SZ[1]-1,j,2:SZ[3]-1]
-
-    #heatmap(s, xlabel="X-axis", ylabel="Z-axis", title="Y=$j")
-    p = contour(s, fill=true, c=:thermal, xlabel="Z-axis", ylabel="X-axis", title="Y=$j", size=(600, 600))
-    savefig(p, fname)
-end
-
-
-#=
-@brief XZ断面(全セル)
-@param [in]     ｄ      解ベクトル
-@param [in]     SZ     配列長
-@param [in]     fname  ファイル名
-=#
-function plot_slice2(d::Array{Float64,3}, SZ, fname)
-    j = div(SZ[2],2)
-    s = d[1:SZ[1],j,1:SZ[3]]
-
-    #heatmap(s, xlabel="X-axis", ylabel="Z-axis", title="Y=$j")
-    p = contour(s, fill=true, c=:thermal, xlabel="Z-axis", ylabel="X-axis", title="Y=$j", size=(600, 600))
-    savefig(p, fname)
-end
 
 
 #=
@@ -152,69 +103,37 @@ end
 
 
 #=
-@brief SOR法による求解
-@param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
-@param [in]     λ    熱伝導率
-@param [in]     b    RHSベクトル
-@param [in]     mask マスク配列
-@param [in]     Δh   セル幅
-@param [in]     F    ファイルディスクリプタ
+function writeSPH(size, org, pch, step, time, var)
+    ccall((:write_sph_d, "./iosph.so"), Nothing,
+    (Ref{Int64},    # size
+     Ref{Float64},  # org
+     Ref{Float64},  # pch
+     Ref{Int64},    # step
+     Ref{Float64},  # time
+     Ref{Float64}), # var
+     size, org, pch, step, time, var)
+end
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, F)
 
-    res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω)
-    if res0==0.0
-        res0 = 1.0
-    end
-    println("Inital residual = ", res0)
-
-    n = 0
-    for n in 1:ItrMax
-        res = sor!(θ, SZ, λ, b, mask, Δh, ω) / res0
-        #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
-        #println(n, " ", res)
-        @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < tol
-            println("Converged at ", n)
-            return
+# Z軸座標の生成
+# mode==1のとき等間隔、Δz=(top-bottom)/(SZ[3]-2)
+function genZ!(Z::Vector{Float64}, SZ, mode::Int64, ox, dz::Float64)
+    if mode==1 
+        for k in 1:SZ[3]+1
+            Z[k] = ox[3] + (k-2)*dz
+        end
+    else
+        for k in 1:SZ[3]+1
+            Z[k] = ox[3] + (k-2)*dz
         end
     end
-end
-
-
-#=
-@brief 緩和ヤコビ法による求解
-@param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
-@param [in]     λ    熱伝導率
-@param [in]     b    RHSベクトル
-@param [in]     mask マスク配列
-@param [in]     wk   ワーク配列
-@param [in]     Δh   セル幅
-@param [in]     F    ファイルディスクリプタ
-=#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, F)
-
-    res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω)
-    if res0==0.0
-        res0 = 1.0
+    
+    #=
+    for k in 1:SZ[3]+1
+        @printf(stdout, "%3d : %6.3f\n", k, Z[k])
     end
-    println("Inital residual = ", res0)
-
-    n = 0
-    for n in 1:ItrMax
-        res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, wk) / res0
-        #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
-        
-        @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < tol
-            println("Converged at ", n)
-            return
-        end
-    end
+    =#
 end
-
 
 #=
 @param [in] SZ       内部セル数
@@ -223,12 +142,13 @@ end
 @param [in] θ        解ベクトル
 @param [in] solver   ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother ["jacobi", "gs", ""]
-@param [in] example   例題番号
+@param [in] mode     動作モード   
 =#
-function main(SZ, Δh, exact, θ, solver, smoother, example)
+function main(SZ, Δh, exact, θ, solver, smoother, mode)
 
     λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
     λ .= 1.0 # default
+    #=
     if example==1
         setMat_1!(λ, SZ)
     elseif example==2
@@ -240,8 +160,9 @@ function main(SZ, Δh, exact, θ, solver, smoother, example)
         return
     end
     plot_slice2(λ, SZ, "lambda.png")
+    =#
 
-    boundary_condition!(θ, SZ, Δh)
+    Cartesian.boundary_condition!(θ, SZ, Δh)
     #plot_slice2(θ, SZ, "p0.png")
 
     b = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -267,11 +188,11 @@ function main(SZ, Δh, exact, θ, solver, smoother, example)
     F = open("res.txt", "w")
 
     if solver=="sor"
-        solveSOR!(θ, SZ, λ, b, mask, Δh, F)
+        Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
     elseif solver=="jacobi"
-        solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, F)
+        Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
     elseif solver=="pbicgstab"
-        PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+        Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, Δh, SZ, ItrMax, smoother, F)
     else
         println("solver error")
@@ -296,34 +217,61 @@ end
 =#
 
 #=
-@param [in] NN_inner  内部セル数
-@param [in] example   例題番号
+@param [in] mode (
+                    1--Uniform in Z-dir, (Cartesian)
+                    2--Uniform for X&Y and Non-uniform in Z, but data is uniform
+                    3--Uniform for X&Y and Non-uniform in Z
+@param NXY  Number of inner cells for X&Y dir.
+@param NZ   Number of inner cells for Z dir.
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother  ["jacobi", "gs", ""]
 =#
-function diff3d(NN_inner::Int64, example=1, solver::String="sor", smoother::String="")
-    NN = NN_inner + 2  # Number of CVs including boundaries
+function q3d(mode::Int64, NXY::Int64, NZ::Int64, solver::String="sor", smoother::String="")
 
-    dh::Float64 = 1.0 / NN_inner
+    MX = MY = NXY + 2  # Number of CVs including boundaries
+    MZ = NZ + 2
+
+    if mode==1
+        if NXY != NZ
+            println("NXY must be equal to NZ")
+            return
+        end
+        dh::Float64 = 1.0 / NXY
+        SZ = (MX, MY, MZ)
+    elseif !(mode==2 || mode==3)
+        println("mode error")
+        return
+    end
+
+    SZ = (MX, MY, MZ)
     Δh = (dh, dh, dh)
-    # ox = (0.0, 0.0, 0.0) 原点を仮定
-    SZ = (NN, NN, NN)
+    ox = (0.0, 0.0, 0.0) #原点を仮定
+    
+    println(SZ)
+    println(Δh)
+
+    Z = zeros(Float64, SZ[3]+1)
+
+    if mode>=2
+        genZ!(Z, SZ, mode, ox, Δh[3])
+    end
     
 
     exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
-    exact_solution!(exact, SZ, Δh)
+    if mode==1
+        Cartesian.exact_solution!(exact, SZ, ox, Δh)
+    else
+        exact_solution!(exact, SZ, ox, Δh, Z)
+    end
     plot_slice(exact, SZ, "exact.png")
-    #writeSPH(SZ, ox, Δh, 0, 0.0, exact)
 
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
 
-    @time main(SZ, Δh, exact, θ, solver, smoother, example)
+    @time main(SZ, Δh, exact, θ, solver, smoother, mode)
 
     plot_slice2(θ, SZ, "p.png")
     plot_slice2(θ-exact, SZ, "diff.png")
 end
 
-diff3d(1) # just compile　JITコンパイルを行うためにパラメータは1
-diff3d(25, 1, "jacobi", "") # ここで本実行し、計測
-# solver : ["jacobi", "sor", "pbicgstab"]
-# smoother : ["jacobi", "gs", ""]
+q3d(1, 1, 1) # just compile　JITコンパイルを行うためにパラメータは1
+q3d(1, 25, 25, "pbicgstab") # ここで本実行し、計測

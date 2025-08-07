@@ -1,5 +1,6 @@
 using Printf
 using Plots
+using LinearAlgebra
 
 # Harmonic mean
 # @param a left value
@@ -236,8 +237,8 @@ function solve!(θ, SZ, λ, b, mask, Δh, ω, tol, F)
     for n in 1:Itr_max
         res = sor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
-        println(n, " ", res)
-        #@printf(F, "%10d %24.14E\n", n, res)
+        #println(n, " ", res)
+        @printf(F, "%10d %24.14E\n", n, res)
         if res < tol
             println("Converge at ", n)
             return
@@ -263,6 +264,8 @@ function main(SZ, O, Δh, ω, tol, exact, θ)
 
     F = open("res.txt", "w")
     solve!(θ, SZ, λ, b, mask, Δh, ω, tol, F)
+    nrm = sqrt(norm(θ-exact,2))
+    @printf(F, "Sum of norm = %24.14E\n", nrm)
     close(F)
 end
 
