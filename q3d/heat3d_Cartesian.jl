@@ -358,7 +358,7 @@ function rbsor_core!(p::Array{Float64,3},
                      m::Array{Float64,3}, 
                      Δh, 
                      ω::Float64, 
-                     color::Int32)
+                     color::Int)
 
     res::Float64 = 0.0
     dx0 = Δh[1]
@@ -456,7 +456,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
                    wk::Array{Float64,3},
                     Δh,
                     SZ,
-               ItrMax::Int32,
+               ItrMax::Int,
              smoother::String,
                     F)
    
@@ -646,7 +646,7 @@ function Preconditioner!(xx::Array{Float64,3},
                    smoother::String)
 
     res::Float64 = 0.0
-    LCmax::Int32 = 5
+    LCmax::Int = 5
 
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)

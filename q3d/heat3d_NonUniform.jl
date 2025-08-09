@@ -291,11 +291,14 @@ end
 @param [in]     Δh   セル幅
 @param [in]     ω    緩和係数
 @param [in]     Z    Z座標
+@param [in]     ΔZ   格子幅
+@param [in]     z_st Zループ開始インデクス
+@param [in]     z_ed Zループ終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, F)
+function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F)
 
-    res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω, Z)
+    res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
     if res0==0.0
         res0 = 1.0
     end
@@ -303,7 +306,7 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, F)
 
     n = 0
     for n in 1:ItrMax
-        res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, Z, wk) / res0
+        res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, wk) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
@@ -315,10 +318,126 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, F)
 end
 
 
+#=
+@brief 緩和Jacobi法の残差
+@param [in,out] p    解ベクトル
+@param [in]     SZ   配列長
+@param [in]     λ    熱伝導率
+@param [in]     b    右辺ベクトル
+@param [in]     m    マスク配列
+@param [in]     Δh   セル幅
+@param [in] 　　　　　　　　ω    緩和係数
+@param [in]     Z    Z座標
+@param [in]     ΔZ   格子幅
+@param [in]     z_st Zループ開始インデクス
+@param [in]     z_ed Zループ終了インデクス
+@ret                 1セルあたりの残差RMS
+=#
+function resJCB(p::Array{Float64,3},
+                SZ,
+                λ::Array{Float64,3}, 
+                b::Array{Float64,3},
+                m::Array{Float64,3}, 
+                Δh, 
+                ω::Float64, 
+                Z::Vector{Float64}, 
+                ΔZ::Vector{Float64}, 
+                z_st::Int, 
+                z_ed::Int)
+
+    res::Float64 = 0.0
+    dx0 = Δh[1]
+    dy0 = Δh[2]
+    dx2 = 1.0 / (dx0*dx0)
+    dy2 = 1.0 / (dy0*dy0)
+
+    for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+        pp = p[i,j,k]
+        bb = b[i,j,k]
+        λ0 = λ[i,j,k]
+        m0 = m[i,j,k]
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        at = λa(λ0, m[i,j,k+1], m0) / (ΔZ[k]*(Z[k+1]-Z[k]))
+        ab = λa(λ0, m[i,j,k-1], m0) / (ΔZ[k]*(Z[k]-Z[k-1]))
+        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
+        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
+             + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
+             + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        dp = (((ss-bb)/dd - pp)) * m0
+        r = dd*dp / ω
+        res += r*r
+    end
+
+    return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(z_ed-z_st+1))
+end
 
 
+#=
+@brief 緩和Jacobi法
+@param [in,out] p    解ベクトル
+@param [in]     SZ   配列長
+@param [in]     λ    熱伝導率
+@param [in]     b    右辺ベクトル
+@param [in]     m    マスク配列
+@param [in]     Δh   セル幅
+@param [in] 　　　　　　　　ω    緩和係数
+@param [in]     Z    Z座標
+@param [in]     ΔZ   格子幅
+@param [in]     z_st Zループ開始インデクス
+@param [in]     z_ed Zループ終了インデクス
+@param [out]    wk   ワーク用配列
+@ret                 1セルあたりの残差RMS
+=#
+function jacobi!(p::Array{Float64,3},
+                 SZ,
+                 λ::Array{Float64,3}, 
+                 b::Array{Float64,3},
+                 m::Array{Float64,3}, 
+                 Δh, 
+                 ω::Float64,
+                 Z::Vector{Float64}, 
+                ΔZ::Vector{Float64}, 
+              z_st::Int, 
+              z_ed::Int,
+                wk::Array{Float64,3})
 
+    res::Float64 = 0.0
+    dx0 = Δh[1]
+    dy0 = Δh[2]
+    dx2 = 1.0 / (dx0*dx0)
+    dy2 = 1.0 / (dy0*dy0)
 
+    for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+        pp = p[i,j,k]
+        bb = b[i,j,k]
+        λ0 = λ[i,j,k]
+        m0 = m[i,j,k]
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        at = λa(λ0, m[i,j,k+1], m0) / (ΔZ[k]*(Z[k+1]-Z[k]))
+        ab = λa(λ0, m[i,j,k-1], m0) / (ΔZ[k]*(Z[k]-Z[k-1]))
+        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
+        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
+             + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
+             + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        dp = (((ss-bb)/dd - pp)) * m0
+        pn = pp + ω * dp
+        wk[i,j,k] = pn
+        r = dd*dp / ω
+        res += r*r
+    end
+
+    for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+        p[i,j,k] = wk[i,j,k]
+    end
+
+    return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(z_ed-z_st+1))
+end
 
 
 
