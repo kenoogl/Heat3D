@@ -39,9 +39,7 @@ end
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 =#
-function boundary_condition!(p::Array{Float64,3}, SZ, Δh)
-
-    ox = (0.0, 0.0, 0.0)
+function boundary_condition!(p::Array{Float64,3}, SZ, ox, Δh)
 
     for j in 2:SZ[2]-1, i in 2:SZ[1]-1
         x = ox[1] + Δh[1]*(i-1.5)
@@ -360,7 +358,7 @@ function rbsor_core!(p::Array{Float64,3},
                      m::Array{Float64,3}, 
                      Δh, 
                      ω::Float64, 
-                     color::Int64)
+                     color::Int32)
 
     res::Float64 = 0.0
     dx0 = Δh[1]
@@ -458,7 +456,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
                    wk::Array{Float64,3},
                     Δh,
                     SZ,
-               ItrMax::Int64,
+               ItrMax::Int32,
              smoother::String,
                     F)
    
@@ -648,7 +646,7 @@ function Preconditioner!(xx::Array{Float64,3},
                    smoother::String)
 
     res::Float64 = 0.0
-    LCmax::Int64 = 5
+    LCmax::Int32 = 5
 
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)

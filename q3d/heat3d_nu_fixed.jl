@@ -7,10 +7,9 @@ include("heat3d_NonUniform.jl")
 
 const ω      = 1.0
 
-
-#include("../base/pbicgstab.jl")
-#
-include("plotter.jl")
+# 元のプロッタと新しいプロッタの両方をインクルード
+include("plotter.jl")         # 元の関数（plot_slice, plot_slice2）
+include("plotter_nu.jl")      # NonUniform対応関数
 
 #=
 @brief マスク指定
@@ -21,7 +20,6 @@ include("plotter.jl")
         ノイマン型　断熱境界 : λ_BC=0.0
 =#
 function setMask!(m::Array{Float64,3}, SZ)
-
     for j in 1:SZ[2], i in 1:SZ[1]
         m[i,j,1    ] = 0.0
         m[i,j,SZ[3]] = 0.0
@@ -38,7 +36,6 @@ function setMask!(m::Array{Float64,3}, SZ)
     end
 end
 
-
 #=
 @brief 熱伝導率の設定 例題1 一様分布
 @param [in]     λ      熱伝導率
@@ -47,51 +44,6 @@ end
 function setMat_1!(λ::Array{Float64,3}, SZ)
     λ .= 1.0
 end
-
-
-#=
-@brief 熱伝導率の設定 例題2 5分割
-@param [in]     λ      熱伝導率
-@param [in]     SZ     配列長
-
-function setMat_2!(λ::Array{Float64,3}, SZ)
-
-    d = div(SZ[1]-2, 5)
-    i1 = 2 + d
-    i2 = 2 + d*2
-    i3 = 2 + d*3
-    i4 = 2 + d*4
-
-    for k in 2:SZ[3]-1, j in 2:SZ[2]-1
-        for i in 2:i1-1
-            λ[i,j,k] = 1.0
-        end
-        for i in i1:i2-1
-            λ[i,j,k] = 5.0
-        end
-        for i in i2:i3-1
-            λ[i,j,k] = 10.0
-        end
-        for i in i3:i4-1
-            λ[i,j,k] = 20.0
-        end
-        for i in i4:SZ[1]-1
-            λ[i,j,k] = 30.0
-        end
-    end
-end
-
-
-#=
-@brief 熱伝導率の設定 例題3 ランダム分布
-@param [in]     λ      熱伝導率
-@param [in]     SZ     配列長
-=#
-function setMat_3!(λ::Array{Float64,3}, SZ)
-    copy!(λ, rand(SZ[1], SZ[2], SZ[3]) .* 50.0)
-end
-=#
-
 
 #=
 @brief RHSの設定
@@ -102,48 +54,24 @@ function calRHS!(b::Array{Float64,3}, SZ)
     b .= 0.0
 end
 
-
-
 #=
-@param [in] mode     動作モード   
 @param [in] SZ       内部セル数
 @param [in] Δh       セル幅
 @param [in] exact    厳密解
 @param [in] θ        解ベクトル
 @param [in] solver   ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother ["jacobi", "gs", ""]
+@param [in] mode     動作モード   
 =#
-function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
-
+function main(SZ, Δh, exact, θ, solver, smoother, mode)
     λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
     λ .= 1.0 # default
-    #=
-    if example==1
-        setMat_1!(λ, SZ)
-    elseif example==2
-        setMat_2!(λ, SZ)
-    elseif example==3
-        setMat_3!(λ, SZ)
-    else
-        println("example error")
-        return
-    end
-    plot_slice2(λ, SZ, "lambda.png")
-    =#
-    if mode==1
-        Cartesian.boundary_condition!(θ, SZ, ox, Δh)
-    else
-        NonUniform.boundary_condition!(θ, SZ, ox, Δh)
-    end
-    #plot_slice2(θ, SZ, "p0.png")
+
+    Cartesian.boundary_condition!(θ, SZ, Δh) # NonUniform 
 
     b = zeros(Float64, SZ[1], SZ[2], SZ[3])
-    #calRHS!(b, SZ)
-
     mask = ones(Float64, SZ[1], SZ[2], SZ[3])
     setMask!(mask, SZ)
-    #plot_slice2(mask, SZ, "mask.png")
-
     wk = zeros(Float64, SZ[1], SZ[2], SZ[3])
 
     if solver=="pbicgstab"
@@ -160,45 +88,19 @@ function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
     F = open("res.txt", "w")
 
     if solver=="sor"
-        if mode==1
-            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
-        else
-            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, 3, SZ[3]-2, F)
-        end
+        Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
     elseif solver=="jacobi"
-        if mode==1
-            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
-        else
-        end
+        Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
     elseif solver=="pbicgstab"
-        if mode==1
-            Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+        Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, Δh, SZ, ItrMax, smoother, F)
-        else
-        end
     else
         println("solver error")
     end
-
-
     nrm = sqrt(norm(θ-exact,2))
     @printf(F, "Sum of norm = %24.14E\n", nrm)
     close(F)
 end
-
-#=
-# Visio用のsphフォーマット出力
-function writeSPH(size, org, pch, step, time, var)
-    ccall((:write_sph_d, "./iosph.so"), Nothing,
-    (Ref{Int32},    # size
-     Ref{Float64},  # org
-     Ref{Float64},  # pch
-     Ref{Int32},    # step
-     Ref{Float64},  # time
-     Ref{Float64}), # var
-     size, org, pch, step, time, var)
-end
-=#
 
 #=
 @param [in] mode (
@@ -210,8 +112,7 @@ end
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother  ["jacobi", "gs", ""]
 =#
-function q3d(mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String="")
-
+function q3d_fixed(mode::Int64, NXY::Int64, NZ::Int64, solver::String="sor", smoother::String="")
     MX = MY = NXY + 2  # Number of CVs including boundaries
     MZ = NZ + 2
 
@@ -224,57 +125,92 @@ function q3d(mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Strin
         println("NXY must be equal to NZ")
         return
     end
+    
     dh::Float64 = 1.0 / NXY
     SZ = (MX, MY, MZ)
     Δh = (dh, dh, dh)
     ox = (0.0, 0.0, 0.0) #原点を仮定
     
-    println(SZ)
-    println(Δh)
+    println("=== 計算条件 ===")
+    println("SZ = ", SZ)
+    println("Δh = ", Δh)
+    println("Mode = ", mode)
 
     Z = zeros(Float64, SZ[3])
-    ΔZ= zeros(Float64, SZ[3]-1)
-    #@show typeof(Z)
+    ΔZ = zeros(Float64, SZ[3]-1)
 
-    if mode>=2
+    if mode >= 2
+        # NonUniform格子の読み込み
         read_coord, numNodes = NonUniform.read_grid_file()
-        if numNodes != NZ
-            println("Number of genereted grid is not match with parameter NZ")
+        if numNodes != Int(NZ)
+            println("Number of generated grid is not match with parameter NZ")
             return
         end
+        
         for k in 1:NZ
             Z[k+1] = read_coord[k]
         end
         Z[1] = 2*Z[2] - Z[3]
         Z[MZ] = 2*Z[MZ-1] - Z[MZ-2]
+        
         for k in 2:MZ-1
             ΔZ[k] = 0.5*(Z[k+1] - Z[k-1])
         end
         ΔZ[2] = 0.5*ΔZ[2]
         ΔZ[MZ-1] = 0.5*ΔZ[MZ-1]
+        
+        println("=== NonUniform格子情報 ===")
+        @printf("Z座標範囲: [%.6f, %.6f]\n", Z[1], Z[MZ])
+        @printf("最小格子間隔: %.6f\n", minimum(diff(Z)))
+        @printf("最大格子間隔: %.6f\n", maximum(diff(Z)))
+        
+        # 格子分布の可視化
+        plot_grid_distribution_nu(SZ, ox, Δh, Z, "grid_distribution_nu.png")
     end
 
+    # 厳密解の計算
     exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
-    if mode==1
+    if mode == 1
         Cartesian.exact_solution!(exact, SZ, ox, Δh)
-        plot_slice(exact, SZ, ox, Δh,"exact.png")
+        println("=== Cartesian厳密解 ===")
+        plot_slice(exact, SZ, "exact_cartesian.png")
     else
         NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
-        plot_slice_nu(exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png")
+        println("=== NonUniform厳密解 ===")
+        
+        # 従来の方法（問題のあるプロット）
+        plot_slice(exact, SZ, "exact_nu_org.png")
+        println("従来プロット保存: exact_nu_org.png（格子座標系）")
+        
+        # 修正された方法（物理座標系プロット）
+        plot_slice_nu(exact, SZ, ox, Δh, Z, "exact_nu_fixed.png")
+        println("修正プロット保存: exact_nu_fixed.png（物理座標系）")
+        
+        # Cartesian版との比較用（参考）
+        exact_cart = zeros(Float64, SZ[1], SZ[2], SZ[3])
+        Cartesian.exact_solution!(exact_cart, SZ, ox, Δh)
+        plot_slice(exact_cart, SZ, "exact_cartesian_ref.png")
+        println("Cartesian参考プロット保存: exact_cartesian_ref.png")
+        
+        # 比較プロット作成
+        plot_comparison_nu_cart(exact, exact_cart, SZ, ox, Δh, Z, "comparison_nu_cart.png")
+        println("比較プロット保存: comparison_nu_cart.png")
     end
     
+    return  # 計算部分は省略して可視化のみ
+    
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
+    @time main(SZ, Δh, exact, θ, solver, smoother, mode)
 
-    @time main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
-
-    if mode==1
-        plot_slice2(θ, SZ, ox, Δh, "p.png", "solution")
-        plot_slice2(θ-exact, SZ, ox, Δh, "diff.png", "diff")
+    if mode >= 2
+        plot_slice2_nu(θ, SZ, ox, Δh, Z, "p_nu_fixed.png")
+        plot_slice2_nu(θ-exact, SZ, ox, Δh, Z, "diff_nu_fixed.png")
     else
-        plot_slice2_nu(θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
-        plot_slice2_nu(θ-exact, 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        plot_slice2(θ, SZ, "p.png")
+        plot_slice2(θ-exact, SZ, "diff.png")
     end
 end
 
-q3d(2, 1, 1) # just compile　JITコンパイルを行うためにパラメータは1
-q3d(2, 25, 25, "sor") # ここで本実行し、計測
+# テスト実行
+println("=== NonUniform格子可視化修正テスト ===")
+q3d_fixed(2, 25, 25, "sor")  # NonUniform格子での実行
