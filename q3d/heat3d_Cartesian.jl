@@ -456,7 +456,6 @@ function PBiCGSTAB!(X::Array{Float64,3},
                    wk::Array{Float64,3},
                     Δh,
                     SZ,
-               ItrMax::Int,
              smoother::String,
                     F)
    

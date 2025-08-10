@@ -174,8 +174,11 @@ function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
     elseif solver=="pbicgstab"
         if mode==1
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, Δh, SZ, ItrMax, smoother, F)
+                pcg_s_, pcg_t_, λ, mask, wk, Δh, SZ, smoother, F)
         else
+            NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, 3, SZ[3]-2, smoother, F)
         end
     else
         println("solver error")
@@ -191,10 +194,10 @@ end
 # Visio用のsphフォーマット出力
 function writeSPH(size, org, pch, step, time, var)
     ccall((:write_sph_d, "./iosph.so"), Nothing,
-    (Ref{Int32},    # size
+    (Ref{Int},    # size
      Ref{Float64},  # org
      Ref{Float64},  # pch
-     Ref{Int32},    # step
+     Ref{Int},    # step
      Ref{Float64},  # time
      Ref{Float64}), # var
      size, org, pch, step, time, var)
@@ -278,4 +281,4 @@ function q3d(mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Strin
 end
 
 q3d(2, 1, 1) # just compile　JITコンパイルを行うためにパラメータは1
-q3d(2, 25, 25, "jacobi") # ここで本実行し、計測
+q3d(2, 25, 25, "pbicgstab") # ここで本実行し、計測
