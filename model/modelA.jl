@@ -1,5 +1,7 @@
 # Build functions for geometric model
 # Ver. 1.0  2025-07-23
+module modelA
+export fillID!, model_test
 
 using Printf
 using LinearAlgebra
@@ -351,7 +353,7 @@ function is_included_sph(a1, a2, center, radius; samples::Int=50)
 end
 
 # ジオメトリのbboxをフィル
-function FillPlate!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillPlate!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
     b = zeros(Float64, 3)
     L = zeros(Float64, 3)
     c1= zeros(Float64, 3)
@@ -389,7 +391,7 @@ end
 
 
 # 厚さ5µの領域
-function FillPowerGrid!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64}, lx=0.2, ly=0.2)
+function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, lx=0.2, ly=0.2)
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     d1= zeros(Float64, 3)
@@ -422,7 +424,7 @@ function FillPowerGrid!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64}, lx=
 end 
 
 
-function FillResin!(ID::Array{Int64,3}, SZ)
+function FillResin!(ID::Array{UInt8,3}, SZ)
     for k in 1:SZ[3], j in 1:SZ[2], i in 1:SZ[1]
         if 0 == ID[i,j,k]
             ID[i,j,k] = Resin["id"]
@@ -431,7 +433,7 @@ function FillResin!(ID::Array{Int64,3}, SZ)
 end
 
 
-function FillTSV!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     cyl_ctr= zeros(Float64, 2)
@@ -463,7 +465,7 @@ function FillTSV!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64})
 end
 
 
-function FillSolder!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillSolder!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
     r = r_bump # ball radius
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
@@ -552,7 +554,7 @@ function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{Int64,3})
 end
 
 
-function fillID!(ID::Array{Int64,3}, ox, Δh, SZ, Z::Vector{Float64})
+function fillID!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
     println("FillPowerGrid")
     FillPowerGrid!(ID, ox, Δh, SZ, Z)
     println("FillTSV")
@@ -571,7 +573,7 @@ end
 function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
     global mode = m_mode
     MX = MY = NXY + 2  # Number of CVs including boundary cells
-    if mode==2
+    if mode==3
         NZ = 13
     end
     MZ = NZ + 2 # mode=1のときNZはセル数、mode=2のときNZはセル界面数
@@ -585,7 +587,7 @@ function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
     println(SZ)
     println(Δh)
     
-    ID = zeros(Int64, SZ[1], SZ[2], SZ[3])
+    ID = zeros(UInt8, SZ[1], SZ[2], SZ[3])
     if mode==1
         Z = zeros(Float64, SZ[3]+1)
     else
@@ -598,16 +600,16 @@ function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
 
     #plot_slice(ID, SZ, "id.png")
 
-    id_xy(ID, 0.2, SZ, Z, "id_z=0.2.png")
+    
     
     # mode別の可視化関数切り替え
     if mode == 1
-        # Cartesian格子：従来の関数
+        id_xy(ID, 0.195, SZ, Z, "id_z=0.2.png", "Uniform")
         id_yz(ID, 0.3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png")
     else
-        # NonUniform格子：物理座標系対応関数
+        id_xy(ID, 0.195, SZ, Z, "id_z=0.2_nu.png", "NonUniform")
         id_yz_nu(ID, 0.3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png", NXY)
-        plot_slice3(ID, 0.5, SZ, ox, Δh, Z, "slice.png", "NonUniform")
+        #plot_slice3(ID, 0.5, SZ, ox, Δh, Z, "slice.png", "NonUniform")
     end
  
 end
@@ -615,18 +617,18 @@ end
 fixed_colors = [:yellow, :green, :purple, :orange, :blue, :gray, :red]
 Fcolor = palette(fixed_colors)
 
-function id_xy(d::Array{Int64,3}, z, SZ, Z, fname)
+function id_xy(d::Array{UInt8,3}, z, SZ, Z, fname, label::String="")
     k = find_k(Z, z, SZ[3])
     p = heatmap( d[:, :, k], 
         clims=(1,length(Fcolor)), 
-        title="ID z_index=$k",
+        title="ID z=$z (k=$k) $label",
         c = Fcolor,
         colorbar=false,
         size = (600,600) )
     savefig(p, fname)
 end
 
-function id_yz(d::Array{Int64,3}, x, ox, Δh, SZ, Z, fname)
+function id_yz(d::Array{UInt8,3}, x, ox, Δh, SZ, Z, fname)
     i = find_i(x, ox[1], Δh[1], SZ[1])
     s = d[i, 1:SZ[2], 1:SZ[3]]
     y_coords = [ox[2] + Δh[2] * (j - 1.5) for j in 1:SZ[2]]
@@ -641,7 +643,7 @@ function id_yz(d::Array{Int64,3}, x, ox, Δh, SZ, Z, fname)
     savefig(p, fname)
 end
 
-function id_yz2(d::Array{Int64,3}, x, ox, Δh, SZ, Z, fname)
+function id_yz2(d::Array{UInt8,3}, x, ox, Δh, SZ, Z, fname)
     i = find_i(x, ox[1], Δh[1], SZ[1])
     s = vec(d[i, 1:SZ[2], 1:SZ[3]])
     y_coords = repeat([ox[2] + Δh[2] * (j - 1.5) for j in 1:SZ[2]], SZ[3])
@@ -653,7 +655,7 @@ function id_yz2(d::Array{Int64,3}, x, ox, Δh, SZ, Z, fname)
 end
 
 # NonUniform格子対応のid_yz関数（物理座標系を正しく反映?）
-function id_yz_nu(d::Array{Int64,3}, x, ox, Δh, SZ, Z, fname, NXY)
+function id_yz_nu(d::Array{UInt8,3}, x, ox, Δh, SZ, Z, fname, NXY)
     i = find_i(x, ox[1], Δh[1], SZ[1])
     s = d[i, 1:SZ[2], 1:SZ[3]]
     
@@ -677,7 +679,7 @@ end
 
 
 
-function plot_slice(d::Array{Int64,3}, SZ, fname)
+function plot_slice(d::Array{UInt8,3}, SZ, fname)
     j = 16 #div(SZ[3],2)
     s = d[1:SZ[1],j,1:SZ[3]]
 
@@ -696,7 +698,7 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice3(d::Array{Int64,3}, x, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice3(d::Array{UInt8,3}, x, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
     i = find_i(x, ox[1], Δh[1], SZ[1])
     s = convert(Array{Float64}, d[i, 1:SZ[2], 1:SZ[3]])
     
@@ -717,7 +719,15 @@ function plot_slice3(d::Array{Int64,3}, x, SZ, ox, Δh, Z::Vector{Float64}, fnam
     return p
 end
 
+end # end of moduleA
 
-model_test(1,240,120)
-model_test(2,240)
+if abspath(PROGRAM_FILE) == @__FILE__
+    using .modelA
+    model_test(1,240,120)
+    model_test(3,240)
+    #model_test(1,480,240)
+end
+
+#model_test(1,240,120)
+#model_test(3,240)
 #model_test(1,480,240)
