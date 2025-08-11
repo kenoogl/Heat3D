@@ -10,9 +10,10 @@ Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。�
 
 ### ディレクトリ構成
 - `base/`: 基本的な数値解法アルゴリズム（SOR、BiCGSTAB）
-- `q3d/`: 3次元四層構造の熱解析モデル
+- `q3d/`: 3次元四層構造の熱解析モデル（NonUniform格子対応済み）
 - `Vinokur_Julia/`: Vinokurストレッチング関数のJulia実装
 - `vinokur_code/`: C++実装の格子生成コード（元実装）
+- `vinokur_timing/`: 性能比較結果
 
 ### 主要な数値解法
 1. **SOR法** (Successive Over-Relaxation): `heat3d.jl`
@@ -33,8 +34,10 @@ Heat3Dは3次元熱拡散シミュレーションのプロジェクトです。�
 julia base/heat3d.jl          # 基本的な熱拡散計算
 julia base/heat3d_bicg.jl     # BiCGSTAB法による計算
 julia q3d/modelA.jl           # 3次元四層モデルの実行
+julia q3d/heat3d_nu.jl        # NonUniform格子3次元熱拡散（修正済み）
 julia Vinokur_Julia/test_stretch.jl    # Vinokurストレッチング関数テスト
-julia vinokur_timing/benchmark.jl       # C++とJuliaの性能比較
+julia vinokur_timing/benchmark.jl      # C++とJuliaの性能比較
+julia q3d/demo_nonuniform_plot.jl      # NonUniform格子可視化デモ
 ```
 
 ### C++コンパイル（格子生成）
@@ -81,6 +84,11 @@ make clean                    # クリーンアップ
 - `genZ!()`: Z方向非等間隔格子生成
 - `model_test()`: 統合テスト実行
 
+### NonUniform格子対応関数（q3d/plotter.jl）
+- `plot_slice_nu()`: NonUniform格子断面可視化（物理座標系）
+- `plot_slice2_nu()`: NonUniform格子全セル可視化（物理座標系）
+- `find_j()`: Y座標からグリッドインデックス変換
+
 ### Vinokurストレッチング関数（Vinokur_Julia/）
 - `stretch()`: 格子点分布計算（Julia実装）
 - `stretching!()`: 内部ストレッチング計算
@@ -89,9 +97,17 @@ make clean                    # クリーンアップ
 ## Testing and Visualization
 
 ### プロット出力
-- `plot_slice()`: 断面可視化
+- `plot_slice()`: 断面可視化（Cartesian格子用）
+- `plot_slice_nu()`: NonUniform格子対応断面可視化（物理座標系）
+- `plot_slice2()`: 全セル断面可視化（Cartesian格子用）
+- `plot_slice2_nu()`: NonUniform格子対応全セル断面可視化（物理座標系）
 - `id_xy()`, `id_yz()`: 材料分布可視化
 - 出力形式: PNG画像
+
+**NonUniform格子可視化の重要な修正点:**
+- 従来の`plot_slice()`は格子インデックスを座標軸として使用（物理的に不正確）
+- 修正版`plot_slice_nu()`は実際の物理座標（Z座標値）を使用
+- アスペクト比1:1設定により幾何学的正確性を確保
 
 ### 収束判定
 - 相対残差: `tol = 1.0e-8`
@@ -126,7 +142,25 @@ make clean                    # クリーンアップ
 - `Printf`: 出力フォーマット
 - `Plots`: 可視化
 - `BenchmarkTools`: 性能測定（ベンチマーク用）
+- `LinearAlgebra`: 線形代数演算（norm計算等）
 
 ### C++ Requirements
 - g++コンパイラ（pgc++から変更推奨）
 - 数学ライブラリ（標準）
+
+## 重要な改善点
+
+### NonUniform格子可視化問題の解決（v1.1）
+**問題**: `q3d/heat3d_nu.jl`でNonUniform格子の可視化が物理的に不正確
+- 従来の`plot_slice()`は格子インデックスを座標軸として使用
+- 結果: 物理座標系を反映しない歪んだ可視化
+
+**解決策**: 
+1. `plot_slice_nu()`関数を追加（物理座標系対応）
+2. 実際のZ座標値を軸として使用
+3. アスペクト比1:1設定で幾何学的正確性確保
+4. `plotter.jl`に統合済み
+
+**影響するファイル**: 
+- `q3d/plotter.jl`: NonUniform対応関数統合
+- `q3d/heat3d_nu.jl`: 修正版可視化関数呼び出し

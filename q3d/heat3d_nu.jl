@@ -208,7 +208,7 @@ end
 @param [in] mode (
                     1--Uniform in Z-dir, (Cartesian)
                     2--Uniform for X&Y and Non-uniform in Z, but data is uniform
-                    3--Uniform for X&Y and Non-uniform in Z
+                    3--Uniform for X&Y and Non-uniform in Z, modelA
 @param NXY  Number of inner cells for X&Y dir.
 @param NZ   Number of inner cells for Z dir.
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
