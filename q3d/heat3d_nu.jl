@@ -3,14 +3,26 @@ using Random
 using LinearAlgebra
 
 include("heat3d_Cartesian.jl")
+include("heat3d_CartesianII.jl")
 include("heat3d_NonUniform.jl")
-
-const ω      = 1.0
-
-
-#include("../base/pbicgstab.jl")
-#
+include("../model/modelA.jl")
 include("plotter.jl")
+include("const.jl")
+
+
+#=
+@brief 境界条件 熱源項の設定
+@param [in,out] b    右辺項
+@param [in]     SZ   配列長
+@param [in]     ID   識別子配列
+=#
+function calRHS!(b::Array{Float64,3}, ID::Array{UInt8,3}, SZ)
+    for k in 1:SZ[3], j in 1:SZ[2], i in 1:SZ[1]
+        if ID[i,j,k] == modelA.pwrsrc["id"]
+            b[i,j,k] = -Constant.Q_src
+        end
+    end
+end
 
 #=
 @brief マスク指定
@@ -38,82 +50,72 @@ function setMask!(m::Array{Float64,3}, SZ)
     end
 end
 
+function setMask3!(m::Array{Float64,3}, SZ)
 
-#=
-@brief 熱伝導率の設定 例題1 一様分布
-@param [in]     λ      熱伝導率
-@param [in]     SZ     配列長
-=#
-function setMat_1!(λ::Array{Float64,3}, SZ)
-    λ .= 1.0
-end
+    for j in 1:SZ[2], i in 1:SZ[1]
+        m[i,j,1    ] = 0.0
+        m[i,j,SZ[3]] = 0.0
+    end
 
+    for k in 1:SZ[3], i in 1:SZ[1]
+        m[i,1    ,k] = 0.0
+        m[i,SZ[2],k] = 0.0
+    end
 
-#=
-@brief 熱伝導率の設定 例題2 5分割
-@param [in]     λ      熱伝導率
-@param [in]     SZ     配列長
-
-function setMat_2!(λ::Array{Float64,3}, SZ)
-
-    d = div(SZ[1]-2, 5)
-    i1 = 2 + d
-    i2 = 2 + d*2
-    i3 = 2 + d*3
-    i4 = 2 + d*4
-
-    for k in 2:SZ[3]-1, j in 2:SZ[2]-1
-        for i in 2:i1-1
-            λ[i,j,k] = 1.0
-        end
-        for i in i1:i2-1
-            λ[i,j,k] = 5.0
-        end
-        for i in i2:i3-1
-            λ[i,j,k] = 10.0
-        end
-        for i in i3:i4-1
-            λ[i,j,k] = 20.0
-        end
-        for i in i4:SZ[1]-1
-            λ[i,j,k] = 30.0
-        end
+    for k in 1:SZ[3], j in 1:SZ[2]
+        m[1    ,j,k] = 0.0
+        m[SZ[1],j,k] = 0.0
     end
 end
 
 
 #=
-@brief 熱伝導率の設定 例題3 ランダム分布
+@brief 熱伝導率の設定
 @param [in]     λ      熱伝導率
 @param [in]     SZ     配列長
 =#
-function setMat_3!(λ::Array{Float64,3}, SZ)
-    copy!(λ, rand(SZ[1], SZ[2], SZ[3]) .* 50.0)
+function setMatOuter!(λ::Array{Float64,3}, SZ)
+    for j in 1:SZ[2], i in 1:SZ[1]
+        λ[i,j,1    ] = λ[i,j,2    ]
+        λ[i,j,SZ[3]] = 0.0
+    end
+
+    for k in 1:SZ[3], i in 1:SZ[1]
+        λ[i,1    ,k] = λ[i,2    ,k]
+        λ[i,SZ[2],k] = λ[i,SZ[2]-1,k]
+    end
+
+    for k in 1:SZ[3], j in 1:SZ[2]
+        λ[1    ,j,k] = λ[2    ,j,k]
+        λ[SZ[1],j,k] = λ[SZ[1]-1,j,k]
+    end
 end
-=#
-
-
-#=
-@brief RHSの設定
-@param [in]     b    RHSベクトル
-@param [in]     SZ   配列長
-=#
-function calRHS!(b::Array{Float64,3}, SZ)
-    b .= 0.0
-end
 
 
 
-#=
-@param [in] mode     動作モード   
+#= 
 @param [in] SZ       内部セル数
 @param [in] Δh       セル幅
-@param [in] exact    厳密解
 @param [in] θ        解ベクトル
 @param [in] solver   ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother ["jacobi", "gs", ""]
 =#
-function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
+function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
+
+    z_st::Int64=0
+    z_ed::Int64=0
+
+    if mode==1 || mode==4
+        z_st = 2
+        z_ed = SZ[3]-1
+    elseif mode==2
+        z_st = 3
+        z_ed = SZ[3]-2
+    # mode=3の設定では上面は熱伝達、下面は定温
+    elseif mode==3 
+        z_st = 3
+        z_ed = SZ[3]-1
+    end
 
     λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
     λ .= 1.0 # default
@@ -130,19 +132,45 @@ function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
     end
     plot_slice2(λ, SZ, "lambda.png")
     =#
+
+    ID = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
+
+    if mode==3
+        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
+        modelA.setLambda!(λ, SZ, ID)
+        setMatOuter!(λ, SZ)
+        plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
+    elseif mode==4
+        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
+        modelA.setLambda!(λ, SZ, ID)
+        setMatOuter!(λ, SZ)
+        plot_slice_xz(1, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
+    end
+
+
     if mode==1
         Cartesian.boundary_condition!(θ, SZ, ox, Δh)
-    else
+    elseif mode==2
         NonUniform.boundary_condition!(θ, SZ, ox, Δh)
+    elseif mode==3
+        NonUniform.boundary_condition3!(θ, SZ)
+    else
+        CartesianII.boundary_condition4!(θ, SZ)
     end
-    #plot_slice2(θ, SZ, "p0.png")
 
     b = zeros(Float64, SZ[1], SZ[2], SZ[3])
-    #calRHS!(b, SZ)
+    if mode==3 || mode==4
+        calRHS!(b, ID, SZ)
+    end
 
     mask = ones(Float64, SZ[1], SZ[2], SZ[3])
-    setMask!(mask, SZ)
+    if mode==1 || mode==2 || mode==4
+        setMask!(mask, SZ)
+    else
+        setMask3!(mask, SZ)
+    end
     #plot_slice2(mask, SZ, "mask.png")
+
 
     wk = zeros(Float64, SZ[1], SZ[2], SZ[3])
 
@@ -162,32 +190,83 @@ function main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
     if solver=="sor"
         if mode==1
             Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
+        elseif mode==4
+            CartesianII.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
         else
-            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, 3, SZ[3]-2, F)
+            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F)
         end
     elseif solver=="jacobi"
         if mode==1
             Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
+        elseif mode==4
+            CartesianII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
         else
-            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, 3, SZ[3]-2, F)
+            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F)
         end
     elseif solver=="pbicgstab"
         if mode==1
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, Δh, SZ, smoother, F)
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
+        elseif mode==4
+            CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
         else
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, 3, SZ[3]-2, smoother, F)
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode)
         end
     else
         println("solver error")
     end
 
-
-    nrm = sqrt(norm(θ-exact,2))
-    @printf(F, "Sum of norm = %24.14E\n", nrm)
     close(F)
+end
+
+# Z軸座標の生成
+# mode==1のとき等間隔なのでZ座標不要、Δz=(top-bottom)/(SZ[3]-2)
+function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz)
+    mz=SZ[3]
+    if mode==1 || mode==4
+        for k in 1:mz+1
+            Z[k] = ox[3] + (k-2)*dz
+        end
+    elseif mode==2
+        read_coord, numNodes = NonUniform.read_grid_file()
+        if numNodes != mz-2
+            println("Number of genereted grid is not match with parameter NZ")
+            exit(0)
+        end
+        for k in 1:mz-2
+            Z[k+1] = read_coord[k]
+        end
+        Z[1] = 2*Z[2] - Z[3]
+        Z[mz] = 2*Z[mz-1] - Z[mz-2]
+    else
+        # mode = 2, NZ[3]=15
+        Z[1] = -0.05e-3
+        Z[2] = 0.0 #zm0
+        Z[3] = 0.05e-3
+        Z[4] = 0.1e-3 #zm1
+        Z[5] = 0.2e-3-modelA.pg_dpth
+        Z[6] = 0.2e-3
+        Z[7] = 0.25e-3 #zm2
+        Z[8] = 0.35e-3-modelA.pg_dpth
+        Z[9] = 0.35e-3
+        Z[10]= 0.4e-3 #zm3
+        Z[11]= 0.5e-3-modelA.pg_dpth
+        Z[12]= 0.5e-3
+        Z[13]= 0.55e-3 #zm4
+        Z[14]= 0.6e-3  #zm5
+        Z[15]= 0.65e-3
+    end
+
+    for k in 2:mz-1
+        ΔZ[k] = 0.5*(Z[k+1] - Z[k-1])
+    end
+    ΔZ[2] = 0.5*ΔZ[2]
+    ΔZ[mz-1] = 0.5*ΔZ[mz-1]
+    #println(Z)
+    #println(ΔZ)
 end
 
 #=
@@ -206,79 +285,103 @@ end
 
 #=
 @param [in] mode (
-                    1--Uniform in Z-dir, (Cartesian)
-                    2--Uniform for X&Y and Non-uniform in Z, but data is uniform
-                    3--Uniform for X&Y and Non-uniform in Z, modelA
+                    1--Uniform in Z-dir, (Cartesian) : CUBE
+                    2--Uniform for X&Y and Non-uniform in Z, but data is uniform : CUBE
+                    3--Uniform for X&Y and Non-uniform in Z : modelA
+                    4--Uniform : modelA
 @param NXY  Number of inner cells for X&Y dir.
 @param NZ   Number of inner cells for Z dir.
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother  ["jacobi", "gs", ""]
 =#
-function q3d(mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String="")
+function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String="")
+    global mode = m_mode
 
     MX = MY = NXY + 2  # Number of CVs including boundaries
+    if mode==3
+        NZ = 13
+    end
     MZ = NZ + 2
 
-    if !(mode==1 ||mode==2 || mode==3)
+    if !(mode==1 ||mode==2 || mode==3 || mode==4)
         println("mode error")
         return
     end
 
-    if NXY != NZ
-        println("NXY must be equal to NZ")
-        return
+    if mode==1
+        if NXY != NZ
+            println("NXY must be equal to NZ")
+            return
+        end
     end
-    dh::Float64 = 1.0 / NXY
+
+    dh::Float64 = 1.0
+
+    if mode==1 || mode==2
+        dh = 1.0 / NXY
+    else
+        dh = 5e-6 # 5μ [m]
+    end
     SZ = (MX, MY, MZ)
     Δh = (dh, dh, dh)
     ox = (0.0, 0.0, 0.0) #原点を仮定
-    @show typeof(mode)
+
     println(SZ)
     println(Δh)
 
-    Z = zeros(Float64, SZ[3])
+    if mode==1 || mode==4
+        Z = zeros(Float64, SZ[3]+1)
+    else
+        Z = zeros(Float64, SZ[3])
+    end
+
     ΔZ= zeros(Float64, SZ[3]-1)
     #@show typeof(Z)
 
-    if mode>=2
-        read_coord, numNodes = NonUniform.read_grid_file()
-        if numNodes != NZ
-            println("Number of genereted grid is not match with parameter NZ")
-            return
-        end
-        for k in 1:NZ
-            Z[k+1] = read_coord[k]
-        end
-        Z[1] = 2*Z[2] - Z[3]
-        Z[MZ] = 2*Z[MZ-1] - Z[MZ-2]
-        for k in 2:MZ-1
-            ΔZ[k] = 0.5*(Z[k+1] - Z[k-1])
-        end
-        ΔZ[2] = 0.5*ΔZ[2]
-        ΔZ[MZ-1] = 0.5*ΔZ[MZ-1]
-    end
+    genZ!(Z, ΔZ, SZ, ox, Δh[3])
 
-    exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
+    if mode<=2
+        exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
+    end 
+
     if mode==1
         Cartesian.exact_solution!(exact, SZ, ox, Δh)
-        plot_slice(exact, SZ, ox, Δh,"exact.png")
-    else
+        plot_slice_xz(1, exact, Z, 0.5e-3, SZ, ox, Δh, "exact.png", "Exact")
+    elseif mode==2
         NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
-        plot_slice_nu(exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png")
+        plot_slice_xz_nu(1, exact, 0.5e-3, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
+    θ .= Constant.θ_amb # 初期温度設定
 
-    @time main(mode, SZ, ox, Δh, exact, θ, Z, ΔZ, solver, smoother)
+    @time main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
+
+    
+    if mode==1 || mode==2
+        nrm = sqrt(norm(θ-exact,2))
+        F = open("res.txt", "a")
+        @printf(F, "Sum of norm = %24.14E\n", nrm)
+        close(F)
+    end
+    
 
     if mode==1
-        plot_slice2(θ, SZ, ox, Δh, "p.png", "solution")
-        plot_slice2(θ-exact, SZ, ox, Δh, "diff.png", "diff")
+        plot_slice_xz(2, θ, Z, 0.5e-3, SZ, ox, Δh, "p.png", "solution")
+        plot_slice_xz(2, θ-exact, Z, 0.5e-3, SZ, ox, Δh, "diff.png", "diff")
+    elseif mode==2
+        plot_slice_xz_nu(2, θ, 0.5e-3, SZ, ox, Δh, Z, "p_nu.png", "solution")
+        plot_slice_xz_nu(2, θ-exact, 0.5e-3, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+    elseif mode==3
+        plot_slice_xz_nu(1, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu.png", "temperature[K]")
+        plot_slice_xy_nu(1, θ, 0.195e-3, SZ, ox, Δh, Z, "temp3_xy_nu.png", "temperature[K]")
     else
-        plot_slice2_nu(θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
-        plot_slice2_nu(θ-exact, 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        plot_slice_xz(2, θ, Z, 0.3e-3, SZ, ox, Δh, "temp4_xz.png")
+        plot_slice_xy(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy.png")
+        plot_line_z(θ, SZ, ox, Δh, "tempZ.png")
     end
 end
 
-q3d(2, 1, 1) # just compile　JITコンパイルを行うためにパラメータは1
-q3d(2, 25, 25, "pbicgstab") # ここで本実行し、計測
+#q3d(3, 240, 13, "pbicgstab") # ここで本実行し、計測
+#q3d(1, 25, 25, "pbicgstab")
+q3d(4, 240, 120, "pbicgstab", "gs") 

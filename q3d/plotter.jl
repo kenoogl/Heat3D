@@ -1,6 +1,6 @@
 using Plots
 
-function chk_i(i, nx)
+function chk_idx(i, nx)
     if i<1
         i = 1
     end
@@ -10,67 +10,168 @@ function chk_i(i, nx)
     return i
 end
 
-function chk_j(j, ny)
-    if j<1
-        j = 1
-    end
-    if j>ny
-        j = ny
-    end
-    return j
-end
-
 function find_i(x::Float64, x0, dx, nx)
     i = floor( Int32, (x-x0)/dx+1.5 )
-    chk_i(i, nx)
-    return i
+    return chk_idx(i, nx)
 end
 
 function find_j(y::Float64, y0, dy, ny)
     j = floor( Int32, (y-y0)/dy+1.5 )
-    chk_j(j, ny)
-    return j
+    return chk_idx(j, ny)
+end
+
+function find_k(Z::Vector{Float64}, zc, nz, mode)
+    if mode==1 || mode==4
+        if zc<Z[1] || zc>Z[nz+1]
+            println("out of scope in Z : find_z()")
+            println(zc, Z)
+            exit()
+        end
+
+        for k in 1:nz
+            if Z[k] ≤ zc < Z[k+1]
+                return k
+            end
+        end
+    else
+        if zc<Z[1] || zc>Z[nz]
+            println("out of scope in Z : find_z()")
+            println(zc, Z)
+            exit()
+        end
+
+        for k in 1:nz-1
+            if Z[k] ≤ zc < Z[k+1]
+                return k
+            end
+        end
+    end
 end
 
 #=
-@brief XZ断面（内部セル）
+@brief XZ断面
+@param [in]     region 1--全領域, 2--内部, 3-- trim
 @param [in]     ｄ      解ベクトル
 @param [in]     SZ     配列長
 @param [in]     ox     原点座標
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice(d::Array{Float64,3}, SZ, ox, Δh, fname)
-    j = div(SZ[2],2)
-    s = d[2:SZ[1]-1,j,2:SZ[3]-1]
-    y = ox[2] + Δh[2]*(j-1.5)
+function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fname, label::String="")
+    xs::Int=1
+    xe::Int=SZ[1]
+    zs::Int=1
+    ze::Int=SZ[3]
+    if region==2
+        xs=2
+        xe=SZ[1]-1
+        zs=2
+        ze=SZ[3]-1
+    end
+    if region==3
+        xs=find_i(0.1e-3, ox[1], Δh[1], SZ[1])
+        xe=find_i(1.1e-3, ox[1], Δh[1], SZ[1])
+        zs=find_k(Z, 0.0, SZ[3], 4)
+        ze=find_k(Z, 0.6e-3, SZ[3], 4)
+    end
+    #println(xs,":",xe," ",zs,":",ze)
 
-    #heatmap(s, xlabel="X-axis", ylabel="Z-axis", title="Y=$j")
-    p = contour(s, fill=true, c=:thermal, xlabel="Z-axis", ylabel="X-axis", title="Y=$y (j=$j)", size=(600, 600))
+    j = find_j(y, ox[2], Δh[2], SZ[2])
+    s = d[xs:xe, j, zs:ze]
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
+    z_coords = [(ox[3] + Δh[3] * (k - 1.5))*1000 for k in zs:ze]
+
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("min=", min_val, " max=", max_val)
+
+    if min_val<=0.0
+        min_val = 1.0e-5
+    end
+    log_min = log10(min_val)
+    log_max = log10(max_val)
+    log_ticks = range(log_min, log_max, length=n_ticks)
+    auto_tick_values = [10^x for x in log_ticks]
+    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
+
+    p = contour(z_coords, x_coords, s, 
+        fill=true, 
+        c=:thermal, 
+        colorbar_ticks=(auto_tick_values, auto_tick_labels),
+        colorbar_title="Temperature [K]",
+        xlabel="Z-coordinate", 
+        ylabel="X-coordinate", 
+        title="Y=$(y*1000) [mm] (j=$j) Uniform $label", 
+        size=(600, 600),
+        aspect_ratio=:equal)
     savefig(p, fname)
 end
 
 
 #=
-@brief XZ断面(全セル)
+@brief XZ断面
 @param [in]     ｄ      解ベクトル
 @param [in]     SZ     配列長
 @param [in]     ox     原点座標
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice2(d::Array{Float64,3}, SZ, ox, Δh, fname)
-    j = div(SZ[2],2)
-    s = d[1:SZ[1],j,1:SZ[3]]
-    y = ox[2] + Δh[2]*(j-1.5)
+function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, label::String="")
+    xs::Int=1
+    xe::Int=SZ[1]
+    ys::Int=1
+    ye::Int=SZ[2]
+    if region==2
+        xs=2
+        xe=SZ[1]-1
+        ys=2
+        ye=SZ[2]-1
+    end
+    if region==3
+        xs=find_i(0.1e-3, ox[1], Δh[1], SZ[1])
+        xe=find_i(1.1e-3, ox[1], Δh[1], SZ[1])
+        ys=find_j(0.1e-3, ox[2], Δh[2], SZ[2])
+        ye=find_j(1.1e-3, ox[2], Δh[2], SZ[2])
+    end
+    #println(xs,":",xe," ",ys,":",ye)
+    
+    k = find_k(Z, zc, SZ[3], 4)
+    s = d[xs:xe, ys:ye, k]
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
+    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*1000 for j in ys:ye]
 
-    #heatmap(s, xlabel="X-axis", ylabel="Z-axis", title="Y=$j")
-    p = contour(s, fill=true, c=:thermal, xlabel="Z-axis", ylabel="X-axis", title="Y=$y (j=$j)", size=(600, 600))
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("min=", min_val, " max=", max_val)
+
+    if min_val<=0.0
+        min_val = 1.0e-5
+    end
+    log_min = log10(min_val)
+    log_max = log10(max_val)
+    log_ticks = range(log_min, log_max, length=n_ticks)
+    auto_tick_values = [10^x for x in log_ticks]
+    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
+
+    p = contour(x_coords, y_coords, s, 
+        fill=true, 
+        c=:thermal,  
+        colorbar_ticks=(auto_tick_values, auto_tick_labels),
+        colorbar_title="Temperature [K]",
+        xlabel="X-coordinate", 
+        ylabel="Y-coordinate", 
+        title="Z=$(zc*1000) [mm] (k=$k) Uniform $label", 
+        size=(800, 600),
+        aspect_ratio=:equal)
     savefig(p, fname)
 end
 
+
+
 #=
-@brief XZ断面（内部セル）- NonUniform格子対応
+@brief XZ断面（全セル）- NonUniform格子対応
 @param [in] d      解ベクトル
 @param [in] y      Y座標
 @param [in] SZ     配列長
@@ -79,38 +180,56 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice_nu(d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+    xs::Int=1
+    xe::Int=SZ[1]
+    zs::Int=1
+    ze::Int=SZ[3]
+    if region==2
+        xs=2
+        xe=SZ[1]-1
+        zs=2
+        ze=SZ[3]-1
+    end
+    
     j = find_j(y, ox[2], Δh[2], SZ[2])
-    #j = div(SZ[2], 2)
-    s = d[2:SZ[1]-1, j, 2:SZ[3]-1]
-    #y = ox[2] + Δh[2]*(j-1.5)
+    s = d[xs:xe, j, zs:ze]
     
-    # X方向座標軸（内部セル中心）
-    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in 2:SZ[1]-1]
+    # X方向座標軸（境界含む全セル）
+    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
+    # Z方向座標軸（境界含む全セル、NonUniform）
+    z_coords = [Z[k] for k in zs:ze]
+
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("min=", min_val, " max=", max_val)
+
+    # 対数スケールでティック値を計算
+    if min_val<=0.0
+        min_val = 1.0e-5
+    end
+    log_min = log10(min_val)
+    log_max = log10(max_val)
+    log_ticks = range(log_min, log_max, length=n_ticks)
+    auto_tick_values = [10^x for x in log_ticks]
+    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
     
-    # Z方向座標軸（内部セル中心、NonUniform）
-    z_coords = [Z[k] for k in 2:SZ[3]-1]
-    
-    # 物理座標軸でプロット
     p = contour(z_coords, x_coords, s, 
                 fill=true, 
                 c=:thermal, 
-                xlabel="Z-coordinate [physical]", 
-                ylabel="X-coordinate [physical]", 
-                title="XZ-section (Y=$y, j=$j, NonUniform) $label", 
-                size=(600, 600),
+                colorbar_ticks=(auto_tick_values, auto_tick_labels),
+                colorbar_title="Thermal Diffusion [m^2/s]",
+                xlabel="Z-coordinate", 
+                ylabel="X-coordinate", 
+                title="Y=$y (j=$j) NonUniform $label", 
+                size=(800, 600),
                 aspect_ratio=:equal)
-    
+     
     savefig(p, fname)
     
-    # 格子情報を出力
-    println("NonUniform格子プロット情報:")
-    @printf("  Z座標範囲: [%.6f, %.6f]\n", minimum(z_coords), maximum(z_coords))
-    @printf("  X座標範囲: [%.6f, %.6f]\n", minimum(x_coords), maximum(x_coords))
-    @printf("  Z格子点数: %d (NonUniform)\n", length(z_coords))
-    @printf("  X格子点数: %d (Uniform)\n", length(x_coords))
-    
     return p
+   
 end
 
 #=
@@ -123,29 +242,130 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice2_nu(d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
-    j = find_j(y, ox[2], Δh[2], SZ[2])
-    #j = div(SZ[2], 2)
-    s = d[1:SZ[1], j, 1:SZ[3]]
-    #y = ox[2] + Δh[2]*(j-1.5)
+function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+    xs::Int=1
+    xe::Int=SZ[1]
+    ys::Int=1
+    ye::Int=SZ[2]
+    if region==2
+        xs=2
+        xe=SZ[1]-1
+        ys=2
+        ye=SZ[2]-1
+    end
     
-    # X方向座標軸（境界含む全セル）
-    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in 1:SZ[1]]
+    k = find_k(Z, zc, SZ[3], 3)
+    s = d[xs:xe, ys:ye, k]
     
-    # Z方向座標軸（境界含む全セル、NonUniform）
-    z_coords = Z
+    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
+    y_coords = [ox[2] + Δh[2] * (j - 1.5) for j in ys:ye]
+
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("min=", min_val, " max=", max_val)
+
+    # 対数スケールでティック値を計算
+    if min_val<=0.0
+        min_val = 1.0e-5
+    end
+    log_min = log10(min_val)
+    log_max = log10(max_val)
+    log_ticks = range(log_min, log_max, length=n_ticks)
+    auto_tick_values = [10^x for x in log_ticks]
+    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
     
-    # 物理座標軸でプロット
-    p = contour(z_coords, x_coords, s, 
+    p = contour(x_coords, y_coords, s, 
                 fill=true, 
                 c=:thermal, 
-                xlabel="Z-coordinate [physical]", 
-                ylabel="X-coordinate [physical]", 
-                title="XZ-section full (Y=$y, j=$j, NonUniform) $label", 
-                size=(600, 600),
+                colorbar_ticks=(auto_tick_values, auto_tick_labels),
+                colorbar_title="Temperature [K]",
+                xlabel="X-coordinate", 
+                ylabel="Y-coordinate", 
+                title="Z=$zc (k=$k) NonUniform $label", 
+                size=(800, 600),
                 aspect_ratio=:equal)
-    
+     
     savefig(p, fname)
     
     return p
+end
+
+function plot_line_z_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+    xs::Int=1
+    xe::Int=SZ[1]
+    zs::Int=1
+    ze::Int=SZ[3]
+    if region==2
+        xs=2
+        xe=SZ[1]-1
+        zs=2
+        ze=SZ[3]-1
+    end
+    
+    j = find_j(y, ox[2], Δh[2], SZ[2])
+    s = d[xs:xe, j, zs:ze]
+    
+    # X方向座標軸（境界含む全セル）
+    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
+    # Z方向座標軸（境界含む全セル、NonUniform）
+    z_coords = [Z[k] for k in zs:ze]
+
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("min=", min_val, " max=", max_val)
+
+    # 対数スケールでティック値を計算
+    if min_val<=0.0
+        min_val = 1.0e-5
+    end
+    log_min = log10(min_val)
+    log_max = log10(max_val)
+    log_ticks = range(log_min, log_max, length=n_ticks)
+    auto_tick_values = [10^x for x in log_ticks]
+    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
+    
+    p = contour(z_coords, x_coords, s, 
+                fill=true, 
+                c=:thermal, 
+                colorbar_ticks=(auto_tick_values, auto_tick_labels),
+                colorbar_title="Thermal Diffusion [m^2/s]",
+                xlabel="Z-coordinate", 
+                ylabel="X-coordinate", 
+                title="Y=$y (j=$j) NonUniform $label", 
+                size=(800, 600),
+                aspect_ratio=:equal)
+     
+    savefig(p, fname)
+    
+    return p
+   
+end
+
+function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, fname, label::String="")
+    zs::Int=1
+    ze::Int=SZ[3]
+    xc = 0.5e-3
+    yc = 0.5e-3
+
+    i = find_i(xc, ox[1], Δh[1], SZ[1])
+    j = find_j(yc, ox[2], Δh[2], SZ[2])
+    s = d[i, j, zs:ze]
+    z_coords = [(ox[3] + Δh[3] * (k - 1.5))*1000 for k in zs:ze]
+
+    min_val = minimum(s)
+    max_val = maximum(s)
+    n_ticks = 6
+    println("At ($xc, $yc): min=", min_val, " max=", max_val)
+
+    p = plot(z_coords, s,
+        marker=:circle, 
+        markersize=3,
+        xlabel="Z-coordinate [mm]", 
+        ylabel="Temperature [K]", 
+        title="Line at ($(xc*1e3), $(yc*1e3)) [mm] $label", 
+        size=(600, 600)
+        )
+    savefig(p, fname)
 end

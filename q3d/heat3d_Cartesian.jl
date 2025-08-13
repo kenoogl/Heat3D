@@ -1,11 +1,10 @@
 module Cartesian
-export exact_solution!, boundary_condition!, solveSOR!, solveJACOBI!, PBiCGSTAB!
+export exact_solution!, boundary_condition!, solveSOR!, solveJACOBI!, PBiCGSTAB!,
+       boundary_condition4!
 
 using Printf
 
-const ItrMax = 8000
-const tol    = 1.0e-8
-const FloatMin = 1.0e-37
+include("const.jl")
 
 # Harmonic mean
 # @param a left value
@@ -80,12 +79,12 @@ function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
     println("Inital residual = ", res0)
 
     n = 0
-    for n in 1:ItrMax
+    for n in 1:Constant.ItrMax
         res = sor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #println(n, " ", res)
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < tol
+        if res < Constant.tol
             println("Converged at ", n)
             return
         end
@@ -114,12 +113,12 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
     println("Inital residual = ", res0)
 
     n = 0
-    for n in 1:ItrMax
+    for n in 1:Constant.ItrMax
         res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, wk) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < tol
+        if res < Constant.tol
             println("Converged at ", n)
             return
         end
@@ -454,10 +453,12 @@ function PBiCGSTAB!(X::Array{Float64,3},
                     λ::Array{Float64,3},
                  mask::Array{Float64,3},
                    wk::Array{Float64,3},
+                   ox,
                     Δh,
                     SZ,
              smoother::String,
-                    F)
+                    F,
+                    mode)
    
     fill!(pcg_q, 0.0)
     res0 = CalcRK!(SZ, pcg_r, X, B, λ, mask, Δh)
@@ -470,10 +471,10 @@ function PBiCGSTAB!(X::Array{Float64,3},
     r_omega::Float64 = -omega
     beta::Float64 = 0.0
 
-    for itr in 1:ItrMax
+    for itr in 1:Constant.ItrMax
         rho = Fdot2(pcg_r, pcg_r0, SZ) # 非計算部分はゼロのこと
 
-        if abs(rho) < FloatMin
+        if abs(rho) < Constant.FloatMin
             itr = 0
             break
         end
@@ -501,21 +502,28 @@ function PBiCGSTAB!(X::Array{Float64,3},
         r_omega = -omega
 
         BICG2!(X, pcg_p_, pcg_s_, alpha , omega, SZ)
-        boundary_condition!(X, SZ, Δh)
+        if mode==4
+            # boundary_condition4!(X, SZ)
+        else
+            boundary_condition!(X, SZ, ox, Δh)
+        end
+   
 
         Triad!(pcg_r, pcg_t_, pcg_s, r_omega, SZ)
         res = sqrt(Fdot1(pcg_r, SZ))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
         res /= res0
         #println(itr, " ", res)
         @printf(F, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
+        @printf(stdout, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
 
-        if res<tol
+        if res<Constant.tol
             println("Converged at ", itr)
             break
         end
 
         rho_old = rho
     end # itr
+    @printf(stdout, "\n")
 end
 
 
@@ -633,7 +641,7 @@ end
 @param [in]     wk   作業ベクトル
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
-@param [in]     smoother  ["jacobi", "dor", ""]
+@param [in]     smoother  ["jacobi", "gs", ""]
 =#
 function Preconditioner!(xx::Array{Float64,3},
                          bb::Array{Float64,3}, 

@@ -1,25 +1,27 @@
 # Build functions for geometric model
 # Ver. 1.0  2025-07-23
 module modelA
-export fillID!, model_test
+export fillID!, setLambda!, model_test
 
 using Printf
 using LinearAlgebra
 using Plots
 
+# Unit [m]
 const zm0 = 0.0
-const zm1 = 0.1
-const zm2 = 0.25
-const zm3 = 0.4
-const zm4 = 0.55
-const zm5 = 0.6
-const pg_dpth = 0.005
-const s_dpth = 0.1
-const d_ufill = 0.05
-const r_bump = 0.03
-const r_tsv = 0.02
-const h_tsv = 0.1
+const zm1 = 0.1e-3
+const zm2 = 0.25e-3
+const zm3 = 0.4e-3
+const zm4 = 0.55e-3
+const zm5 = 0.6e-3
+const pg_dpth = 0.005e-3
+const s_dpth = 0.1e-3
+const d_ufill = 0.05e-3
+const r_bump = 0.03e-3
+const r_tsv = 0.02e-3
+const h_tsv = 0.1e-3
 
+# Unit [mm]
 #  k=SZ[3]                           // 15
 #  +----- top            0.6  = zm5  // 14
 #  Heat sink (depth=0.05)
@@ -45,23 +47,23 @@ const h_tsv = 0.1
 # boundary box of each element [mm]
 substrate = Dict(
     "x0" => 0.0, "y0" => 0.0, "z0" => zm0,
-    "Lx" => 1.2, "Ly" => 1.2, "Lz" => 0.05, "mat_id" => 4
+    "Lx" => 1.2e-3, "Ly" => 1.2e-3, "Lz" => 0.05e-3, "mat_id" => 4
 )
 silicon_1 = Dict(
-    "x0" => 0.1, "y0" => 0.1, "z0" => zm1,
-    "Lx" => 1.0, "Ly" => 1.0, "Lz" => 0.1, "mat_id" => 2
+    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm1,
+    "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
 )
 silicon_2 = Dict(
-    "x0" => 0.1, "y0" => 0.1, "z0" => zm2,
-    "Lx" => 1.0, "Ly" => 1.0, "Lz" => 0.1, "mat_id" => 2
+    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm2,
+    "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
 )
 silicon_3 = Dict(
-    "x0" => 0.1, "y0" => 0.1, "z0" => zm3,
-    "Lx" => 1.0, "Ly" => 1.0, "Lz" => 0.1, "mat_id" => 2
+    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm3,
+    "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
 )
 heatsink = Dict(
     "x0" => 0.0, "y0" => 0.0, "z0" => zm4,
-    "Lx" => 1.2, "Ly" => 1.2, "Lz" => 0.05, "mat_id" => 5
+    "Lx" => 1.2e-3, "Ly" => 1.2e-3, "Lz" => 0.05e-3, "mat_id" => 5
 )
 
 # geomに登録
@@ -131,7 +133,7 @@ end
 
 
 
-function chk_i(i, nx)
+function chk_idx(i, nx)
     if i<1
         i = 1
     end
@@ -141,61 +143,50 @@ function chk_i(i, nx)
     return i
 end
 
-function chk_j(j, ny)
-    if j<1
-        j = 1
-    end
-    if j>ny
-        j = ny
-    end
-    return j
-end
-
 function find_Ri(x::Float64, r, x0, dx, nx)
     is = floor( Int64, (x-r-x0)/dx+1.5 )
     ie = floor( Int64, (x+r-x0)/dx+1.5 )
-    chk_i(is, nx)
-    chk_i(ie, nx)
+    is = chk_idx(is, nx)
+    ie = chk_idx(ie, nx)
     return is, ie
 end
 
 function find_Rj(y::Float64, r, y0, dy, ny)
     js = floor( Int64, (y-r-y0)/dy+1.5 )
     je = floor( Int64, (y+r-y0)/dy+1.5 )
-    chk_i(js, ny)
-    chk_i(je, ny)
+    js = chk_idx(js, ny)
+    je = chk_idx(je, ny)
     return js, je
 end
 
 function find_i(x::Float64, x0, dx, nx)
     i = floor( Int64, (x-x0)/dx+1.5 )
-    chk_i(i, nx)
-    return i
+    return chk_idx(i, nx)
 end
 
 function find_j(y::Float64, y0, dy, ny)
     j = floor( Int64, (y-y0)/dy+1.5 )
-    chk_j(j, ny)
-    return j
+    return chk_idx(j, ny)
 end
 
-function find_k(Z::Vector{Float64}, zc, nz)
-    if mode==1
+function find_k(Z::Vector{Float64}, zc, nz, mode)
+    if mode==1 || mode==4 # Uniform
         if zc<Z[1] || zc>Z[nz+1]
             println("out of scope in Z : find_z()")
-            println(zc, Z)
+            println(zc, " ", Z[nz+1])
             exit()
         end
 
         for k in 1:nz
             if Z[k] ≤ zc < Z[k+1]
+                #println(zc, " ", k)
                 return k
             end
         end
-    else
+    else # NonUniform
         if zc<Z[1] || zc>Z[nz]
             println("out of scope in Z : find_z()")
-            println(zc, Z)
+            println(zc, " ", Z[nz])
             exit()
         end
 
@@ -205,22 +196,20 @@ function find_k(Z::Vector{Float64}, zc, nz)
             end
         end
     end
-
-    
 end
 
 
 # ジオメトリのbboxを計算
-function find_index(b, L, ox, Δh, SZ, Z::Vector{Float64})
+function find_index(b, L, ox, Δh, SZ, Z::Vector{Float64}, mode)
     st = zeros(Int64, 3)
     ed = zeros(Int64, 3)
 
-    st[1] = find_i(b[1], ox[1], Δh[1], SZ[1])
-    st[2] = find_i(b[2], ox[2], Δh[2], SZ[2])
-    st[3] = find_k(Z, b[3], SZ[3])
-    ed[1] = find_i(b[1]+L[1], ox[1], Δh[1], SZ[1])
-    ed[2] = find_i(b[2]+L[2], ox[2], Δh[2], SZ[2])
-    ed[3] = find_k(Z, b[3]+L[3], SZ[3])
+    st[1] = chk_idx( find_i(b[1], ox[1], Δh[1], SZ[1]), SZ[1])
+    st[2] = chk_idx( find_i(b[2], ox[2], Δh[2], SZ[2]), SZ[2])
+    st[3] = find_k(Z, b[3], SZ[3], mode)
+    ed[1] = chk_idx( find_i(b[1]+L[1], ox[1], Δh[1], SZ[1]), SZ[1])
+    ed[2] = chk_idx( find_i(b[2]+L[2], ox[2], Δh[2], SZ[2]), SZ[2])
+    ed[3] = find_k(Z, b[3]+L[3], SZ[3], mode)
     return st, ed
 end
 
@@ -353,7 +342,7 @@ function is_included_sph(a1, a2, center, radius; samples::Int=50)
 end
 
 # ジオメトリのbboxをフィル
-function FillPlate!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillPlate!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
     b = zeros(Float64, 3)
     L = zeros(Float64, 3)
     c1= zeros(Float64, 3)
@@ -368,7 +357,7 @@ function FillPlate!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
         L[1] = geom[m]["Lx"]
         L[2] = geom[m]["Ly"]
         L[3] = geom[m]["Lz"]
-        st, ed = find_index(b, L, ox, Δh, SZ, Z)
+        st, ed = find_index(b, L, ox, Δh, SZ, Z, mode)
         #@printf(stdout, "SILICON : [%d %d %d] - [%d %d %d]\n",st[1],st[2],st[3], ed[1],ed[2], ed[3])
         d1 = b
         d2 .= b + L
@@ -391,22 +380,22 @@ end
 
 
 # 厚さ5µの領域
-function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, lx=0.2, ly=0.2)
+function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode, lx=0.2e-3, ly=0.2e-3)
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     d1= zeros(Float64, 3)
     d2= zeros(Float64, 3)
     s = s_dpth-pg_dpth
     pg_count = 0
-    for z in [zm1+s, zm2+s, zm3+s], y in [0.3, 0.7], x in [0.3, 0.7]
+    for z in [zm1+s, zm2+s, zm3+s], y in [0.3e-3, 0.7e-3], x in [0.3e-3, 0.7e-3]
         b = [x, y, z]
         L = [lx, ly, pg_dpth]
-        st, ed = find_index(b, L, ox, Δh, SZ, Z)
+        st, ed = find_index(b, L, ox, Δh, SZ, Z, mode)
         #@printf(stdout, "PG mode=%d: z=%.3f, range=[%.3f,%.3f] -> k=[%d,%d]\n", mode, z, z, z+pg_dpth, st[3], ed[3])
         d1 = b
         d2 .= b + L
         #@printf(stdout, "target : [%f %f %f] - [%f %f %f]\n",d1[1],d1[2],d1[3], d2[1],d2[2],d2[3])
-        for k in st[3]-1:ed[3]+1, j in st[2]-1:ed[2]+1, i in st[1]-1:ed[1]+1
+        for k in st[3]-1:ed[3], j in st[2]-1:ed[2], i in st[1]-1:ed[1]
             c1[1] = ox[1] + Δh[1]*(i-1)
             c1[2] = ox[2] + Δh[2]*(j-1)
             c1[3] = Z[k]
@@ -433,24 +422,24 @@ function FillResin!(ID::Array{UInt8,3}, SZ)
 end
 
 
-function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     cyl_ctr= zeros(Float64, 2)
     cyl_r = r_tsv
 
-    for z in [zm1, zm2, zm3], y in [0.3, 0.5, 0.7, 0.9], x in [0.3, 0.5, 0.7, 0.9]
+    for z in [zm1, zm2, zm3], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
         cyl_ctr[1] = x
         cyl_ctr[2] = y
         cyl_zmin = z
         cyl_zmax = z + h_tsv
         is, ie = find_Ri(x, cyl_r, ox[1], Δh[1], SZ[1])
         js, je = find_Rj(y, cyl_r, ox[2], Δh[2], SZ[2])
-        ks = find_k(Z, cyl_zmin, SZ[3])
-        ke = find_k(Z, cyl_zmax, SZ[3])
+        ks = find_k(Z, cyl_zmin, SZ[3], mode)
+        ke = find_k(Z, cyl_zmax, SZ[3], mode)
         #@printf(stdout, "TSV : [%d - %d]\n",ks, ke)
 
-        for k in ks-1:ke+1, j in js-1:je+1, i in is-1:ie+1
+        for k in ks-1:ke, j in js-1:je, i in is-1:ie
             c1[1] = ox[1] + Δh[1]*(i-1)
             c1[2] = ox[2] + Δh[2]*(j-1)
             c1[3] = Z[k]
@@ -465,24 +454,24 @@ function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
 end
 
 
-function FillSolder!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
+function FillSolder!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
     r = r_bump # ball radius
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     ctr= zeros(Float64, 3)
     dp = d_ufill*0.5
 
-    for z in [zm1-dp, zm2-dp, zm3-dp, zm4-dp], y in [0.3, 0.5, 0.7, 0.9], x in [0.3, 0.5, 0.7, 0.9]
+    for z in [zm1-dp, zm2-dp, zm3-dp, zm4-dp], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
         ctr[1] = x
         ctr[2] = y
         ctr[3] = z
         is, ie = find_Ri(x, r, ox[1], Δh[1], SZ[1])
         js, je = find_Rj(y, r, ox[2], Δh[2], SZ[2])
-        ks = find_k(Z, z-dp, SZ[3])
-        ke = find_k(Z, z+dp, SZ[3])
+        ks = find_k(Z, z-dp, SZ[3], mode)
+        ke = find_k(Z, z+dp, SZ[3], mode)
         #@printf(stdout, "BUMP: [%d %d %d - %d %d %d]\n", is, js, ks, ie, je, ke)
 
-        for k in ks-1:ke+1, j in js-1:je+1, i in is-1:ie+1
+        for k in ks-1:ke, j in js-1:je, i in is-1:ie
             c1[1] = ox[1] + Δh[1]*(i-1)
             c1[2] = ox[2] + Δh[2]*(j-1)
             c1[3] = Z[k]
@@ -499,28 +488,28 @@ end
 
 # Z軸座標の生成
 # mode==1のとき等間隔、Δz=(top-bottom)/(SZ[3]-2)
-function genZ!(Z::Vector{Float64}, SZ, b, dz::Float64)
+function genZ!(mode, Z::Vector{Float64}, SZ, b, dz::Float64)
     if mode==1 
         for k in 1:SZ[3]+1
             Z[k] = b[3] + (k-2)*dz
         end
     else
         # mode = 2, NZ[3]=15
-        Z[1] = -0.05
+        Z[1] = -0.05e-3
         Z[2] = 0.0 #zm0
-        Z[3] = 0.05
-        Z[4] = 0.1 #zm1
-        Z[5] = 0.2-pg_dpth
-        Z[6] = 0.2
-        Z[7] = 0.25 #zm2
-        Z[8] = 0.35-pg_dpth
-        Z[9] = 0.35
-        Z[10]= 0.4 #zm3
-        Z[11]= 0.5-pg_dpth
-        Z[12]= 0.5
-        Z[13]= 0.55 #zm4
-        Z[14]= 0.6  #zm5
-        Z[15]= 0.65
+        Z[3] = 0.05e-3
+        Z[4] = 0.1e-3 #zm1
+        Z[5] = 0.2e-3-pg_dpth
+        Z[6] = 0.2e-3
+        Z[7] = 0.25e-3 #zm2
+        Z[8] = 0.35e-3-pg_dpth
+        Z[9] = 0.35e-3
+        Z[10]= 0.4e-3 #zm3
+        Z[11]= 0.5e-3-pg_dpth
+        Z[12]= 0.5e-3
+        Z[13]= 0.55e-3 #zm4
+        Z[14]= 0.6e-3  #zm5
+        Z[15]= 0.65e-3
     end
     
     #=
@@ -532,7 +521,7 @@ end
 
 
 # ここでλは温度拡散率
-function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{Int64,3})
+function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{UInt8,3})
     for k in 1:SZ[3], j in 1:SZ[2], i in 1:SZ[1]
         t = ID[i,j,k]
         if t == pwrsrc["id"]
@@ -554,24 +543,23 @@ function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{Int64,3})
 end
 
 
-function fillID!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
+function fillID!(mode, ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
     println("FillPowerGrid")
-    FillPowerGrid!(ID, ox, Δh, SZ, Z)
+    FillPowerGrid!(ID, ox, Δh, SZ, Z, mode)
     println("FillTSV")
-    FillTSV!(ID, ox, Δh, SZ, Z)
+    FillTSV!(ID, ox, Δh, SZ, Z, mode)
     println("FillPlate")
-    FillPlate!(ID, ox, Δh, SZ, Z)
+    FillPlate!(ID, ox, Δh, SZ, Z, mode)
     println("FillSolder")
-    FillSolder!(ID, ox, Δh, SZ, Z)
+    FillSolder!(ID, ox, Δh, SZ, Z, mode)
     println("FillResin")
     FillResin!(ID, SZ)
 end
 
-# @param m_mode (1--Uniform in Z-dir, 2--Non-uniform in Z), while Uniform for X&Y
+# @param mode (1--Uniform in Z-dir, 2--Non-uniform in Z), while Uniform for X&Y
 # @param NXY  Number of inner cells for X&Y dir.
 # @param NZ   Number of inner cells for Z dir.
-function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
-    global mode = m_mode
+function model_test(mode::Int64, NXY::Int64, NZ::Int64=13)
     MX = MY = NXY + 2  # Number of CVs including boundary cells
     if mode==3
         NZ = 13
@@ -593,9 +581,9 @@ function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
     else
         Z = zeros(Float64, SZ[3])
     end
-    genZ!(Z, SZ, ox, Δh[3])
+    genZ!(mode, Z, SZ, ox, Δh[3])
 
-    @time fillID!(ID, ox, Δh, SZ, Z)
+    @time fillID!(mode, ID, ox, Δh, SZ, Z)
 
 
     #plot_slice(ID, SZ, "id.png")
@@ -604,11 +592,11 @@ function model_test(m_mode::Int64, NXY::Int64, NZ::Int64=13)
     
     # mode別の可視化関数切り替え
     if mode == 1
-        id_xy(ID, 0.195, SZ, Z, "id_z=0.2.png", "Uniform")
-        id_yz(ID, 0.3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png")
+        id_xy(mode, ID, 0.195e-3, SZ, Z, "id_z=0.2.png", "Uniform")
+        id_yz(ID, 0.3e-3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png")
     else
-        id_xy(ID, 0.195, SZ, Z, "id_z=0.2_nu.png", "NonUniform")
-        id_yz_nu(ID, 0.3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png", NXY)
+        id_xy(mode, ID, 0.195e-3, SZ, Z, "id_z=0.2_nu.png", "NonUniform")
+        id_yz_nu(ID, 0.3e-3, ox, Δh, SZ, Z, "id_x=0.3_$(NXY)x$(NZ).png", NXY)
         #plot_slice3(ID, 0.5, SZ, ox, Δh, Z, "slice.png", "NonUniform")
     end
  
@@ -617,8 +605,8 @@ end
 fixed_colors = [:yellow, :green, :purple, :orange, :blue, :gray, :red]
 Fcolor = palette(fixed_colors)
 
-function id_xy(d::Array{UInt8,3}, z, SZ, Z, fname, label::String="")
-    k = find_k(Z, z, SZ[3])
+function id_xy(mode, d::Array{UInt8,3}, z, SZ, Z, fname, label::String="")
+    k = find_k(Z, z, SZ[3], mode)
     p = heatmap( d[:, :, k], 
         clims=(1,length(Fcolor)), 
         title="ID z=$z (k=$k) $label",

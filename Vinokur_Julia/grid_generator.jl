@@ -26,7 +26,7 @@ Vinokurストレッチング関数を使って格子点分布を生成し、
 - `success::Bool`: 計算成功フラグ
 """
 function generate_and_save_grid(x1::Float64, x2::Float64, sp1::Float64, sp2::Float64, 
-                               numNodes::Int, filename::String="grid.dat"; debug::Bool=false)
+                               numNodes::Int, filename::String="grid.txt"; debug::Bool=false)
   
   # 格子点分布計算
   coord, success = stretch(x1, x2, sp1, sp2, numNodes, debug=debug)
