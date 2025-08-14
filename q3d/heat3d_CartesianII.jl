@@ -133,6 +133,8 @@ function resSOR(p::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -140,11 +142,15 @@ function resSOR(p::Array{Float64,3},
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -185,6 +191,8 @@ function resJCB(p::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -192,11 +200,15 @@ function resJCB(p::Array{Float64,3},
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -239,6 +251,8 @@ function jacobi!(p::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -246,11 +260,15 @@ function jacobi!(p::Array{Float64,3},
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -298,6 +316,8 @@ function sor!(p::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -305,11 +325,15 @@ function sor!(p::Array{Float64,3},
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -355,6 +379,8 @@ function rbsor_core!(p::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1
@@ -363,11 +389,15 @@ function rbsor_core!(p::Array{Float64,3},
             bb = b[i,j,k]
             λ0 = λ[i,j,k]
             m0 = m[i,j,k]
+            me = 1.0-m[i+1,j  ,k  ]
+            mw = 1.0-m[i-1,j  ,k  ]
+            mn = 1.0-m[i  ,j+1,k  ]
+            ms = 1.0-m[i  ,j-1,k  ]
             mt = 1.0-m[i  ,j  ,k+1]
-            ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-            aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-            an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-            as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+            ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+            aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+            an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+            as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
             at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
             ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
             dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -544,16 +574,22 @@ function CalcRK!(SZ,
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
@@ -687,16 +723,22 @@ function CalcAX!(ap::Array{Float64,3},
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
     dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*Constant.HT_top
         ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0

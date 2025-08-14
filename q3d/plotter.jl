@@ -102,8 +102,8 @@ function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fnam
         colorbar_title="Temperature [K]",
         xlabel="Z-coordinate", 
         ylabel="X-coordinate", 
-        title="Y=$(y*1000) [mm] (j=$j) Uniform $label", 
-        size=(600, 600),
+        title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
+        size=(800, 600),
         aspect_ratio=:equal)
     savefig(p, fname)
 end
@@ -154,6 +154,7 @@ function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, l
     log_ticks = range(log_min, log_max, length=n_ticks)
     auto_tick_values = [10^x for x in log_ticks]
     auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
+    title_str="Cross-section at Z=" * @sprintf("%.1f", zc*1000) * " [mm] (k=$k) Uniform $label"
 
     p = contour(x_coords, y_coords, s, 
         fill=true, 
@@ -162,8 +163,8 @@ function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, l
         colorbar_title="Temperature [K]",
         xlabel="X-coordinate", 
         ylabel="Y-coordinate", 
-        title="Z=$(zc*1000) [mm] (k=$k) Uniform $label", 
-        size=(800, 600),
+        title=title_str, 
+        size=(1000, 600),
         aspect_ratio=:equal)
     savefig(p, fname)
 end
@@ -353,6 +354,7 @@ function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, fname, label::String="")
     j = find_j(yc, ox[2], Δh[2], SZ[2])
     s = d[i, j, zs:ze]
     z_coords = [(ox[3] + Δh[3] * (k - 1.5))*1000 for k in zs:ze]
+    println(s)
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -364,7 +366,8 @@ function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, fname, label::String="")
         markersize=3,
         xlabel="Z-coordinate [mm]", 
         ylabel="Temperature [K]", 
-        title="Line at ($(xc*1e3), $(yc*1e3)) [mm] $label", 
+        title="Z-Line at (x=$(xc*1e3), y=$(yc*1e3)) [mm] $label", 
+        label="",
         size=(600, 600)
         )
     savefig(p, fname)

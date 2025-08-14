@@ -68,6 +68,32 @@ function setMask3!(m::Array{Float64,3}, SZ)
     end
 end
 
+function conditions(F, SZ, Δh, solver, smoother)
+    if mode==1
+        @printf(F, "Problem : CUBE on Cartesian grid\n")
+    elseif mode==2
+        @printf(F, "Problem : CUBE on NonUniform grid from file\n")
+    elseif mode==3
+        @printf(F, "Problem : IC on NonUniform grid (Opt. 13 layers)\n")
+    elseif mode==4
+        @printf(F, "Problem : IC on Cartesian grid\n")
+    end
+
+    @printf(F, "Grid  : %d %d %d\n", SZ[1], SZ[2], SZ[3])
+    @printf(F, "Pitch : %6.4e %6.4e %6.4e\n", Δh[1], Δh[2], Δh[3])
+    if solver=="pbicgstab"
+        @printf(F, "Solver: %s with smoother %s\n", solver, smoother)
+    else
+        @printf(F, "Solver: %s\n", solver)
+    end
+    @printf(F, "ItrMax : %e\n", Constant.ItrMax)
+    @printf(F, "ε      : %e\n", Constant.tol)
+    @printf(F, "θ_amb  : %e\n", Constant.θ_amb)
+    @printf(F, "θ_pcb  : %e\n", Constant.θ_pcb)
+    @printf(F, "HT_top : %e\n", Constant.HT_top)
+    @printf(F, "HT_side: %e\n", Constant.HT_side)
+    @printf(F, "Q_src  : %e\n", Constant.Q_src)
+end
 
 #=
 @brief 熱伝導率の設定
@@ -81,13 +107,13 @@ function setMatOuter!(λ::Array{Float64,3}, SZ)
     end
 
     for k in 1:SZ[3], i in 1:SZ[1]
-        λ[i,1    ,k] = λ[i,2    ,k]
-        λ[i,SZ[2],k] = λ[i,SZ[2]-1,k]
+        λ[i,1    ,k] = 0.0 #λ[i,2    ,k]
+        λ[i,SZ[2],k] = 0.0 #λ[i,SZ[2]-1,k]
     end
 
     for k in 1:SZ[3], j in 1:SZ[2]
-        λ[1    ,j,k] = λ[2    ,j,k]
-        λ[SZ[1],j,k] = λ[SZ[1]-1,j,k]
+        λ[1    ,j,k] = 0.0 #λ[2    ,j,k]
+        λ[SZ[1],j,k] = 0.0 #λ[SZ[1]-1,j,k]
     end
 end
 
@@ -185,7 +211,8 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
         pcg_t_ = zeros(Float64, SZ[1], SZ[2], SZ[3])
     end
 
-    F = open("res.txt", "w")
+    F = open("log.txt", "w")
+    conditions(F, SZ, Δh, solver, smoother)
 
     if solver=="sor"
         if mode==1
@@ -218,6 +245,10 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     else
         println("solver error")
     end
+
+    min_val = minimum(θ)
+    max_val = maximum(θ)
+    println("θmin=", min_val, " θmax=", max_val, " L2 norm of θ=",sqrt(norm(θ,2)))
 
     close(F)
 end
@@ -360,8 +391,8 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     
     if mode==1 || mode==2
         nrm = sqrt(norm(θ-exact,2))
-        F = open("res.txt", "a")
-        @printf(F, "Sum of norm = %24.14E\n", nrm)
+        F = open("log.txt", "a")
+        @printf(F, "L2 norm of error = %24.14E\n", nrm)
         close(F)
     end
     
@@ -380,6 +411,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         plot_slice_xy(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy.png")
         plot_line_z(θ, SZ, ox, Δh, "tempZ.png")
     end
+
 end
 
 #q3d(3, 240, 13, "pbicgstab") # ここで本実行し、計測
