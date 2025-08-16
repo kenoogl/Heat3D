@@ -170,6 +170,7 @@ function find_j(y::Float64, y0, dy, ny)
 end
 
 function find_k(Z::Vector{Float64}, zc, nz, mode)
+
     if mode==1 || mode==4 # Uniform
         if zc<Z[1] || zc>Z[nz+1]
             println("out of scope in Z : find_z()")
@@ -178,7 +179,7 @@ function find_k(Z::Vector{Float64}, zc, nz, mode)
         end
 
         for k in 1:nz
-            if Z[k] ≤ zc < Z[k+1]
+            if round(Z[k],digits=8) ≤ zc < round(Z[k+1],digits=8)
                 #println(zc, " ", k)
                 return k
             end
@@ -186,7 +187,7 @@ function find_k(Z::Vector{Float64}, zc, nz, mode)
     else # NonUniform
         if zc<Z[1] || zc>Z[nz]
             println("out of scope in Z : find_z()")
-            println(zc, " ", Z[nz])
+            println(zc, " ", round(Z[nz],digits=8))
             exit()
         end
 

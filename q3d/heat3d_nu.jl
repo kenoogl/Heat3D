@@ -5,6 +5,7 @@ using LinearAlgebra
 include("heat3d_Cartesian.jl")
 include("heat3d_CartesianII.jl")
 include("heat3d_NonUniform.jl")
+include("heat3d_NonUniformII.jl")
 include("../model/modelA.jl")
 include("plotter.jl")
 include("const.jl")
@@ -50,23 +51,6 @@ function setMask!(m::Array{Float64,3}, SZ)
     end
 end
 
-function setMask3!(m::Array{Float64,3}, SZ)
-
-    for j in 1:SZ[2], i in 1:SZ[1]
-        m[i,j,1    ] = 0.0
-        m[i,j,SZ[3]] = 0.0
-    end
-
-    for k in 1:SZ[3], i in 1:SZ[1]
-        m[i,1    ,k] = 0.0
-        m[i,SZ[2],k] = 0.0
-    end
-
-    for k in 1:SZ[3], j in 1:SZ[2]
-        m[1    ,j,k] = 0.0
-        m[SZ[1],j,k] = 0.0
-    end
-end
 
 function conditions(F, SZ, Δh, solver, smoother)
     if mode==1
@@ -140,47 +124,34 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     # mode=3の設定では上面は熱伝達、下面は定温
     elseif mode==3 
         z_st = 3
-        z_ed = SZ[3]-1
+        z_ed = SZ[3]-1 
     end
 
     λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
     λ .= 1.0 # default
-    #=
-    if example==1
-        setMat_1!(λ, SZ)
-    elseif example==2
-        setMat_2!(λ, SZ)
-    elseif example==3
-        setMat_3!(λ, SZ)
-    else
-        println("example error")
-        return
-    end
-    plot_slice2(λ, SZ, "lambda.png")
-    =#
 
     ID = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
 
-    if mode==3
+
+    if mode==3 || mode==4
         modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
         modelA.setLambda!(λ, SZ, ID)
         setMatOuter!(λ, SZ)
+    end
+    
+    if mode==3
         plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
     elseif mode==4
-        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
-        modelA.setLambda!(λ, SZ, ID)
-        setMatOuter!(λ, SZ)
         plot_slice_xz(1, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
     end
-
 
     if mode==1
         Cartesian.boundary_condition!(θ, SZ, ox, Δh)
     elseif mode==2
         NonUniform.boundary_condition!(θ, SZ, ox, Δh)
     elseif mode==3
-        NonUniform.boundary_condition3!(θ, SZ)
-    else
+        NonUniformII.boundary_condition3!(θ, SZ)
+    elseif mode==4
         CartesianII.boundary_condition4!(θ, SZ)
     end
 
@@ -190,11 +161,7 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     end
 
     mask = ones(Float64, SZ[1], SZ[2], SZ[3])
-    if mode==1 || mode==2 || mode==4
-        setMask!(mask, SZ)
-    else
-        setMask3!(mask, SZ)
-    end
+    setMask!(mask, SZ)
     #plot_slice2(mask, SZ, "mask.png")
 
 
@@ -216,41 +183,109 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
 
     if solver=="sor"
         if mode==1
-            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
+            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F)
+        elseif mode==2
+            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+        elseif mode==3
+            NonUniformII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
         elseif mode==4
-            CartesianII.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
-        else
-            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F)
+            CartesianII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F)
         end
     elseif solver=="jacobi"
         if mode==1
-            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
+            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F)
+        elseif mode==2
+            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+        elseif mode==3
+            NonUniformII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
         elseif mode==4
-            CartesianII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
-        else
-            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F)
+            CartesianII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F)
         end
     elseif solver=="pbicgstab"
         if mode==1
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
-        elseif mode==4
-            CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
-        else
+        elseif mode==2
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
                 ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode)
+        elseif mode==3
+            NonUniformII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode)
+        elseif mode==4
+            CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
         end
     else
         println("solver error")
     end
 
-    min_val = minimum(θ)
-    max_val = maximum(θ)
-    println("θmin=", min_val, " θmax=", max_val, " L2 norm of θ=",sqrt(norm(θ,2)))
+    s = θ[2:SZ[1]-1, 2:SZ[2]-1, z_st:z_ed]
+    min_val = minimum(s)
+    max_val = maximum(s)
+    @printf(F, "θmin=%e  θmax=%e  L2 norm of θ=%e\n", min_val, max_val, norm(s,2))
 
     close(F)
+end
+
+function Zcase1!(Z::Vector{Float64}, SZ)
+    if SZ[3]!=15
+        println("MZ must be 15")
+        exit(0)
+    end
+    Z[1] = -0.05e-3
+    Z[2] = 0.0 #zm0
+    Z[3] = 0.05e-3
+    Z[4] = 0.1e-3 #zm1
+    Z[5] = 0.2e-3-modelA.pg_dpth
+    Z[6] = 0.2e-3
+    Z[7] = 0.25e-3 #zm2
+    Z[8] = 0.35e-3-modelA.pg_dpth
+    Z[9] = 0.35e-3
+    Z[10]= 0.4e-3 #zm3
+    Z[11]= 0.5e-3-modelA.pg_dpth
+    Z[12]= 0.5e-3
+    Z[13]= 0.55e-3 #zm4
+    Z[14]= 0.6e-3  #zm5
+    Z[15]= 0.65e-3
+end
+
+function Zcase2!(Z::Vector{Float64}, SZ)
+    if SZ[3]!=24
+        println("MZ must be 24")
+        exit(0)
+    end
+    Z[1] = -0.025e-3
+    Z[2] = 0.0 #zm0
+    Z[3] = 0.025e-3
+    Z[4] = 0.05e-3
+    Z[5] = 0.075e-3
+    Z[6] = 0.1e-3 #zm1
+    Z[7] = 0.15e-3
+    Z[8] = 0.2e-3-modelA.pg_dpth
+    Z[9] = 0.2e-3 #zm2
+    Z[10] = 0.225e-3 
+    Z[11] = 0.25e-3
+    Z[12] = 0.3e-3
+    Z[13] = 0.35e-3-modelA.pg_dpth
+    Z[14] = 0.35e-3
+    Z[15] = 0.375e-3
+    Z[16]= 0.4e-3 #zm3
+    Z[17]= 0.45e-3
+    Z[18]= 0.5e-3-modelA.pg_dpth
+    Z[19]= 0.5e-3
+    Z[20]= 0.525e-3
+    Z[21]= 0.55e-3 #zm4
+    Z[22]= 0.575e-3
+    Z[23]= 0.6e-3  #zm5
+    Z[24]= 0.625e-3
+end
+
+function Zcase3!(Z::Vector{Float64}, SZ, ox, dz)
+    for k in 1:SZ[3]
+        Z[k] = ox[3] + (k-2)*dz
+    end
 end
 
 # Z軸座標の生成
@@ -273,29 +308,19 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz)
         Z[1] = 2*Z[2] - Z[3]
         Z[mz] = 2*Z[mz-1] - Z[mz-2]
     else
-        # mode = 2, NZ[3]=15
-        Z[1] = -0.05e-3
-        Z[2] = 0.0 #zm0
-        Z[3] = 0.05e-3
-        Z[4] = 0.1e-3 #zm1
-        Z[5] = 0.2e-3-modelA.pg_dpth
-        Z[6] = 0.2e-3
-        Z[7] = 0.25e-3 #zm2
-        Z[8] = 0.35e-3-modelA.pg_dpth
-        Z[9] = 0.35e-3
-        Z[10]= 0.4e-3 #zm3
-        Z[11]= 0.5e-3-modelA.pg_dpth
-        Z[12]= 0.5e-3
-        Z[13]= 0.55e-3 #zm4
-        Z[14]= 0.6e-3  #zm5
-        Z[15]= 0.65e-3
+        #Zcase1!(Z, SZ)
+        #Zcase2!(Z, SZ)
+        Zcase3!(Z, SZ, ox, dz)
     end
 
     for k in 2:mz-1
         ΔZ[k] = 0.5*(Z[k+1] - Z[k-1])
     end
-    ΔZ[2] = 0.5*ΔZ[2]
-    ΔZ[mz-1] = 0.5*ΔZ[mz-1]
+
+    if mode==3 || mode==2
+        ΔZ[2] = 0.5*ΔZ[2]
+        ΔZ[mz-1] = 0.5*ΔZ[mz-1]
+    end
     #println(Z)
     #println(ΔZ)
 end
@@ -313,6 +338,15 @@ function writeSPH(size, org, pch, step, time, var)
      size, org, pch, step, time, var)
 end
 =#
+function dif(θ, exact, SZ)
+    d=0.0
+    for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+       s = (θ[i,j,k]-exact[i,j,k])
+       d = d + s*s
+    end
+    return sqrt(d)
+end
+
 
 #=
 @param [in] mode (
@@ -330,7 +364,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     MX = MY = NXY + 2  # Number of CVs including boundaries
     if mode==3
-        NZ = 13
+        NZ = 121 #13
     end
     MZ = NZ + 2
 
@@ -350,9 +384,11 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     if mode==1 || mode==2
         dh = 1.0 / NXY
-    else
-        dh = 5e-6 # 5μ [m]
+    elseif mode==3 || mode==4
+        dh = 1.2e-3 / NXY
     end
+    dh = round(dh,digits=8)
+
     SZ = (MX, MY, MZ)
     Δh = (dh, dh, dh)
     ox = (0.0, 0.0, 0.0) #原点を仮定
@@ -377,10 +413,10 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     if mode==1
         Cartesian.exact_solution!(exact, SZ, ox, Δh)
-        plot_slice_xz(1, exact, Z, 0.5e-3, SZ, ox, Δh, "exact.png", "Exact")
+        plot_slice_xz(1, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
     elseif mode==2
         NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
-        plot_slice_xz_nu(1, exact, 0.5e-3, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
+        plot_slice_xz_nu(1, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -390,7 +426,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     
     if mode==1 || mode==2
-        nrm = sqrt(norm(θ-exact,2))
+        nrm = dif(θ, exact, SZ)
         F = open("log.txt", "a")
         @printf(F, "L2 norm of error = %24.14E\n", nrm)
         close(F)
@@ -398,22 +434,36 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     
 
     if mode==1
-        plot_slice_xz(2, θ, Z, 0.5e-3, SZ, ox, Δh, "p.png", "solution")
-        plot_slice_xz(2, θ-exact, Z, 0.5e-3, SZ, ox, Δh, "diff.png", "diff")
+        plot_slice_xz(2, θ, Z, 0.5, SZ, ox, Δh, "p.png", "solution")
+        plot_slice_xz(2, abs.(θ-exact), Z, 0.5, SZ, ox, Δh, "diff.png", "diff")
+        println(" L2 norm of θ-exact=",dif(θ, exact, SZ))
     elseif mode==2
-        plot_slice_xz_nu(2, θ, 0.5e-3, SZ, ox, Δh, Z, "p_nu.png", "solution")
-        plot_slice_xz_nu(2, θ-exact, 0.5e-3, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        plot_slice_xz_nu(2, θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
+        plot_slice_xz_nu(2, abs.(θ-exact), 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        println(" L2 norm of θ-exact=",dif(θ, exact, SZ))
     elseif mode==3
-        plot_slice_xz_nu(1, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu.png", "temperature[K]")
-        plot_slice_xy_nu(1, θ, 0.195e-3, SZ, ox, Δh, Z, "temp3_xy_nu.png", "temperature[K]")
+        plot_slice_xz_nu(2, θ, 0.3e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.3.png")
+        plot_slice_xz_nu(2, θ, 0.4e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.4.png")
+        plot_slice_xz_nu(2, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.5.png")
+        plot_slice_xy_nu(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
+        plot_slice_xy_nu(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
+        plot_slice_xy_nu(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr.png", "Center")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv.png", "TSV")
     else
-        plot_slice_xz(2, θ, Z, 0.3e-3, SZ, ox, Δh, "temp4_xz.png")
-        plot_slice_xy(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy.png")
-        plot_line_z(θ, SZ, ox, Δh, "tempZ.png")
+        plot_slice_xz(2, θ, Z, 0.3e-3, SZ, ox, Δh, "temp4_xz_y=0.3.png")
+        plot_slice_xz(2, θ, Z, 0.4e-3, SZ, ox, Δh, "temp4_xz_y=0.4.png")
+        plot_slice_xz(2, θ, Z, 0.5e-3, SZ, ox, Δh, "temp4_xz_y=0.5.png")
+        plot_slice_xy(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.18.png")
+        plot_slice_xy(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.33.png")
+        plot_slice_xy(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.48.png")
+        plot_line_z(θ, SZ, ox, Δh, 0.6e-3, 0.6e-3, "temp4Z_ctr.png", "Center")
+        plot_line_z(θ, SZ, ox, Δh, 0.4e-3, 0.4e-3, "temp4Z_tsv.png", "TSV")
     end
 
 end
 
-#q3d(3, 240, 13, "pbicgstab") # ここで本実行し、計測
 #q3d(1, 25, 25, "pbicgstab")
-q3d(4, 240, 120, "pbicgstab", "gs") 
+#q3d(2, 25, 25, "sor")
+q3d(3, 240, 121, "pbicgstab", "gs")
+#q3d(4, 240, 120, "pbicgstab", "gs") 

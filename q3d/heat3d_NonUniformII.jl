@@ -1,4 +1,4 @@
-module NonUniform
+module NonUniformII
 export exact_solution!, read_grid_file, solveSOR!, solveJACOBI!, PBiCGSTAB!, 
        boundary_condition!, boundary_condition3!
 
@@ -116,6 +116,31 @@ function boundary_condition!(p::Array{Float64,3}, SZ, ox, Δh)
     end
 end
 
+#=
+@brief 境界条件 上面　熱伝達、下面　定温
+@param [in,out] p    解ベクトル
+@param [in]     SZ   配列長
+@param [in]     Δh   セル幅
+=#
+function boundary_condition3!(p::Array{Float64,3}, SZ)
+
+    for j in 2:SZ[2]-1, i in 2:SZ[1]-1
+        p[i,j,1    ] = Constant.θ_pcb
+        p[i,j,SZ[3]] = Constant.θ_amb
+    end
+
+    for k in 2:SZ[3]-1, i in 2:SZ[1]-1
+        p[i,1    ,k] = Constant.θ_amb #p[i,2    ,k]
+        p[i,SZ[2],k] = Constant.θ_amb #p[i,SZ[2]-1,k]
+    end
+
+    for k in 2:SZ[3]-1, j in 2:SZ[2]-1
+        p[1    ,j,k] = Constant.θ_amb #p[2    ,j,k]
+        p[SZ[1],j,k] = Constant.θ_amb #p[SZ[1]-1,j,k]
+    end
+
+end
+
 
 
 #=
@@ -187,20 +212,27 @@ function resSOR(p::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
@@ -246,20 +278,27 @@ function sor!(p::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
@@ -350,20 +389,27 @@ function resJCB(p::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
@@ -412,20 +458,27 @@ function jacobi!(p::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
         bb = b[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
@@ -584,18 +637,25 @@ function CalcRK!(SZ,
     dy0::Float64 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
@@ -701,7 +761,7 @@ function Preconditioner!(xx::Array{Float64,3},
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)
         for _ in 1:LCmax
-            res = jacobi!(xx, SZ, λ, bb, mask, Δh, 0.8, wk, Z, ΔZ, z_st, z_ed)
+            res = jacobi!(xx, SZ, λ, bb, mask, Δh, 0.8, wk)
         end
     elseif smoother=="gs"
         #P_SOR!(xx, bb, LCmax, SZ, λ, mask, Δh)
@@ -739,18 +799,25 @@ function CalcAX!(ap::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
+        me = 1.0-m[i+1,j  ,k  ]
+        mw = 1.0-m[i-1,j  ,k  ]
+        mn = 1.0-m[i  ,j+1,k  ]
+        ms = 1.0-m[i  ,j-1,k  ]
+        mt = m[i,j,k+1]
         mb = m[i,j,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2
+        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*Constant.HT_side
+        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*Constant.HT_side
+        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*Constant.HT_side
+        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*Constant.HT_side
         zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
         zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k]
-        at = λ0         / (ΔZ[k]*zt)
+        at = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*Constant.HT_top
         ab = λ[i,j,k-1] / (ΔZ[k]*zb)
         dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
         ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]

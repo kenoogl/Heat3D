@@ -154,7 +154,7 @@ function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, l
     log_ticks = range(log_min, log_max, length=n_ticks)
     auto_tick_values = [10^x for x in log_ticks]
     auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
-    title_str="Cross-section at Z=" * @sprintf("%.1f", zc*1000) * " [mm] (k=$k) Uniform $label"
+    title_str="Cross-section at Z=" * @sprintf("%.3f", zc*1000) * " [mm] (k=$k) Uniform $label"
 
     p = contour(x_coords, y_coords, s, 
         fill=true, 
@@ -192,14 +192,20 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
         zs=2
         ze=SZ[3]-1
     end
+    if region==3
+        xs=find_i(0.1e-3, ox[1], Δh[1], SZ[1])
+        xe=find_i(1.1e-3, ox[1], Δh[1], SZ[1])
+        zs=find_k(Z, 0.0, SZ[3], 4)
+        ze=find_k(Z, 0.6e-3, SZ[3], 4)
+    end
     
     j = find_j(y, ox[2], Δh[2], SZ[2])
     s = d[xs:xe, j, zs:ze]
     
     # X方向座標軸（境界含む全セル）
-    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
     # Z方向座標軸（境界含む全セル、NonUniform）
-    z_coords = [Z[k] for k in zs:ze]
+    z_coords = [Z[k]*1000 for k in zs:ze]
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -223,14 +229,11 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
                 colorbar_title="Thermal Diffusion [m^2/s]",
                 xlabel="Z-coordinate", 
                 ylabel="X-coordinate", 
-                title="Y=$y (j=$j) NonUniform $label", 
+                title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
                 size=(800, 600),
                 aspect_ratio=:equal)
      
     savefig(p, fname)
-    
-    return p
-   
 end
 
 #=
@@ -254,12 +257,18 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
         ys=2
         ye=SZ[2]-1
     end
+    if region==3
+        xs=find_i(0.1e-3, ox[1], Δh[1], SZ[1])
+        xe=find_i(1.1e-3, ox[1], Δh[1], SZ[1])
+        ys=find_j(0.1e-3, ox[2], Δh[2], SZ[2])
+        ye=find_j(1.1e-3, ox[2], Δh[2], SZ[2])
+    end
     
     k = find_k(Z, zc, SZ[3], 3)
     s = d[xs:xe, ys:ye, k]
     
-    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
-    y_coords = [ox[2] + Δh[2] * (j - 1.5) for j in ys:ye]
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
+    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*1000 for j in ys:ye]
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -275,6 +284,7 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     log_ticks = range(log_min, log_max, length=n_ticks)
     auto_tick_values = [10^x for x in log_ticks]
     auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
+    title_str="Cross-section at Z=" * @sprintf("%.3f", zc*1000) * " [mm] (k=$k) Uniform $label"
     
     p = contour(x_coords, y_coords, s, 
                 fill=true, 
@@ -283,72 +293,41 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
                 colorbar_title="Temperature [K]",
                 xlabel="X-coordinate", 
                 ylabel="Y-coordinate", 
-                title="Z=$zc (k=$k) NonUniform $label", 
+                title=title_str, 
                 size=(800, 600),
                 aspect_ratio=:equal)
      
     savefig(p, fname)
-    
-    return p
 end
 
-function plot_line_z_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
-    xs::Int=1
-    xe::Int=SZ[1]
-    zs::Int=1
-    ze::Int=SZ[3]
-    if region==2
-        xs=2
-        xe=SZ[1]-1
-        zs=2
-        ze=SZ[3]-1
-    end
-    
-    j = find_j(y, ox[2], Δh[2], SZ[2])
-    s = d[xs:xe, j, zs:ze]
-    
-    # X方向座標軸（境界含む全セル）
-    x_coords = [ox[1] + Δh[1] * (i - 1.5) for i in xs:xe]
-    # Z方向座標軸（境界含む全セル、NonUniform）
-    z_coords = [Z[k] for k in zs:ze]
+function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc, yc, fname, label::String="")
+    zs::Int=2
+    ze::Int=SZ[3]-1
+    i = find_i(xc, ox[1], Δh[1], SZ[1])
+    j = find_j(yc, ox[2], Δh[2], SZ[2])
+    s = d[i, j, zs:ze]
+    z_coords = [Z[k]*1000 for k in zs:ze]
+    println(s)
 
     min_val = minimum(s)
     max_val = maximum(s)
-    n_ticks = 6
-    println("min=", min_val, " max=", max_val)
+    println("At ($(xc*1000), $(yc*1000) [mm]: min=", min_val, " max=", max_val)
 
-    # 対数スケールでティック値を計算
-    if min_val<=0.0
-        min_val = 1.0e-5
-    end
-    log_min = log10(min_val)
-    log_max = log10(max_val)
-    log_ticks = range(log_min, log_max, length=n_ticks)
-    auto_tick_values = [10^x for x in log_ticks]
-    auto_tick_labels = [@sprintf("%.1E", v) for v in auto_tick_values]
-    
-    p = contour(z_coords, x_coords, s, 
-                fill=true, 
-                c=:thermal, 
-                colorbar_ticks=(auto_tick_values, auto_tick_labels),
-                colorbar_title="Thermal Diffusion [m^2/s]",
-                xlabel="Z-coordinate", 
-                ylabel="X-coordinate", 
-                title="Y=$y (j=$j) NonUniform $label", 
-                size=(800, 600),
-                aspect_ratio=:equal)
-     
+    p = plot(z_coords, s, 
+             marker=:circle, 
+            markersize=3,
+            xlabel="Z-coordinate [mm]", 
+            ylabel="Temperature [K]", 
+            title="Z-Line at (x=$(xc*1e3), y=$(yc*1e3)) [mm] $label", 
+            label="",
+            size=(600, 600)
+    )
     savefig(p, fname)
-    
-    return p
-   
 end
 
-function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, fname, label::String="")
-    zs::Int=1
-    ze::Int=SZ[3]
-    xc = 0.5e-3
-    yc = 0.5e-3
+function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, xc, yc, fname, label::String="")
+    zs::Int=2
+    ze::Int=SZ[3]-1
 
     i = find_i(xc, ox[1], Δh[1], SZ[1])
     j = find_j(yc, ox[2], Δh[2], SZ[2])
@@ -358,8 +337,7 @@ function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, fname, label::String="")
 
     min_val = minimum(s)
     max_val = maximum(s)
-    n_ticks = 6
-    println("At ($xc, $yc): min=", min_val, " max=", max_val)
+    println("At ($(xc*1000), $(yc*1000) [mm]: min=", min_val, " max=", max_val)
 
     p = plot(z_coords, s,
         marker=:circle, 

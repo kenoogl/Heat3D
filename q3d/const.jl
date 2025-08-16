@@ -1,7 +1,7 @@
 # common constant
 module Constant
 
-const ItrMax = 500 #8000
+const ItrMax = 8000
 const tol    = 1.0e-6
 const FloatMin = 1.0e-37
 const ω      = 1.0
