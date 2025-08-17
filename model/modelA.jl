@@ -7,13 +7,6 @@ using Printf
 using LinearAlgebra
 using Plots
 
-# Unit [m]
-const zm0 = 0.0
-const zm1 = 0.1e-3
-const zm2 = 0.25e-3
-const zm3 = 0.4e-3
-const zm4 = 0.55e-3
-const zm5 = 0.6e-3
 const pg_dpth = 0.005e-3
 const s_dpth = 0.1e-3
 const d_ufill = 0.05e-3
@@ -21,28 +14,47 @@ const r_bump = 0.03e-3
 const r_tsv = 0.02e-3
 const h_tsv = 0.1e-3
 
+# Unit [m]
+const zm12 = 0.6e-3
+const zm11 = 0.55e-3
+const zm10 = 0.5e-3
+const zm9  = zm10 - pg_dpth
+const zm8 = 0.4e-3
+const zm7 = 0.35e-3
+const zm6 = zm7 - pg_dpth
+const zm5 = 0.25e-3
+const zm4 = 0.2e-3
+const zm3 = zm4 - pg_dpth
+const zm2 = 0.1e-3
+const zm1 = 0.05e-3
+const zm0 = 0.0
+
+
+
 # Unit [mm]
-#  k=SZ[3]                           // 15
-#  +----- top            0.6  = zm5  // 14
+#  +----- top            0.6  = zm12
 #  Heat sink (depth=0.05)
-#  +-----                0.55 = zm4  // 13
+#  +-----                0.55 = zm11
 #  underfill (depth=0.05)
-#  +-----                0.5         // 12
-#  Silcon 3 (depth=0.1)              // 11
-#  +-----                0.4 = zm3   // 10
+#  +-----                0.5 = zm10
+#      +--               0.5 - pg_dpth = zm9
+#  Silcon 3 (depth=0.1)           
+#  +-----                0.4 = zm8
 #  underfill (depth=0.05)
-#  +-----                0.35        // 9
-#  Silcon 2 (depth=0.1)              // 8
-#  +-----                0.25 = zm2  // 7
+#  +-----                0.35 = zm7
+#      +--               0.35 - pg_dpth = zm6
+#  Silcon 2 (depth=0.1)             
+#  +-----                0.25 = zm5
 #  underfill (depth=0.05)
-#  +-----                0.2         // 6
-#  Silcon 1 (depth=0.1)              // 5
-#  +-----                0.1 = zm1   // 4
+#  +-----                0.2 = zm4
+#      +--               0.2 - pg_dpth = zm3
+#  Silcon 1 (depth=0.1)             
+#  +-----                0.1 = zm2  
 #  underfill (depth=0.05)
-#  +------               0.05        // 3
+#  +------               0.05 = zm1 
 #  Subtrate (depth=0.05)
-#  +------ bottom        0.0 = zm0   // 2
-#  k=1                               // 1
+#  +------ bottom        0.0 = zm0 
+
 
 # boundary box of each element [mm]
 substrate = Dict(
@@ -50,19 +62,19 @@ substrate = Dict(
     "Lx" => 1.2e-3, "Ly" => 1.2e-3, "Lz" => 0.05e-3, "mat_id" => 4
 )
 silicon_1 = Dict(
-    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm1,
-    "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
-)
-silicon_2 = Dict(
     "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm2,
     "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
 )
+silicon_2 = Dict(
+    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm5,
+    "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
+)
 silicon_3 = Dict(
-    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm3,
+    "x0" => 0.1e-3, "y0" => 0.1e-3, "z0" => zm8,
     "Lx" => 1.0e-3, "Ly" => 1.0e-3, "Lz" => 0.1e-3, "mat_id" => 2
 )
 heatsink = Dict(
-    "x0" => 0.0, "y0" => 0.0, "z0" => zm4,
+    "x0" => 0.0, "y0" => 0.0, "z0" => zm11,
     "Lx" => 1.2e-3, "Ly" => 1.2e-3, "Lz" => 0.05e-3, "mat_id" => 5
 )
 
@@ -388,7 +400,7 @@ function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mod
     d2= zeros(Float64, 3)
     s = s_dpth-pg_dpth
     pg_count = 0
-    for z in [zm1+s, zm2+s, zm3+s], y in [0.3e-3, 0.7e-3], x in [0.3e-3, 0.7e-3]
+    for z in [zm2+s, zm5+s, zm8+s], y in [0.3e-3, 0.7e-3], x in [0.3e-3, 0.7e-3]
         b = [x, y, z]
         L = [lx, ly, pg_dpth]
         st, ed = find_index(b, L, ox, Δh, SZ, Z, mode)
@@ -429,7 +441,7 @@ function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
     cyl_ctr= zeros(Float64, 2)
     cyl_r = r_tsv
 
-    for z in [zm1, zm2, zm3], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
+    for z in [zm2, zm5, zm8], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
         cyl_ctr[1] = x
         cyl_ctr[2] = y
         cyl_zmin = z
@@ -462,7 +474,7 @@ function FillSolder!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
     ctr= zeros(Float64, 3)
     dp = d_ufill*0.5
 
-    for z in [zm1-dp, zm2-dp, zm3-dp, zm4-dp], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
+    for z in [zm1+dp, zm4+dp, zm7+dp, zm10+dp], y in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3], x in [0.3e-3, 0.5e-3, 0.7e-3, 0.9e-3]
         ctr[1] = x
         ctr[2] = y
         ctr[3] = z
@@ -569,7 +581,7 @@ function model_test(mode::Int64, NXY::Int64, NZ::Int64=13)
 
     dx::Float64 = 1.2 / NXY
     dy::Float64 = 1.2 / NXY
-    dz::Float64 = zm5 / NZ
+    dz::Float64 = zm12 / NZ
     Δh = (dx, dy, dz) 
     ox = (0.0, 0.0, 0.0)
     SZ = (MX, MY, MZ)

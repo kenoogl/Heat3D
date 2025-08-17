@@ -234,52 +234,63 @@ function Zcase1!(Z::Vector{Float64}, SZ)
         println("MZ must be 15")
         exit(0)
     end
-    Z[1] = -0.05e-3
-    Z[2] = 0.0 #zm0
-    Z[3] = 0.05e-3
-    Z[4] = 0.1e-3 #zm1
-    Z[5] = 0.2e-3-modelA.pg_dpth
-    Z[6] = 0.2e-3
-    Z[7] = 0.25e-3 #zm2
-    Z[8] = 0.35e-3-modelA.pg_dpth
-    Z[9] = 0.35e-3
-    Z[10]= 0.4e-3 #zm3
-    Z[11]= 0.5e-3-modelA.pg_dpth
-    Z[12]= 0.5e-3
-    Z[13]= 0.55e-3 #zm4
-    Z[14]= 0.6e-3  #zm5
-    Z[15]= 0.65e-3
+    p = 0.005e-3
+    Z[1] = 2.0*modelA.zm0-modelA.zm1
+    Z[2] = modelA.zm0
+    Z[3] = modelA.zm1
+    Z[4] = modelA.zm2
+    Z[5] = modelA.zm3
+    Z[6] = modelA.zm4
+    Z[7] = modelA.zm5
+    Z[8] = modelA.zm6
+    Z[9] = modelA.zm7
+    Z[10]= modelA.zm8
+    Z[11]= modelA.zm9
+    Z[12]= modelA.zm10
+    Z[13]= modelA.zm11
+    Z[14]= modelA.zm12
+    Z[15]= 2.0*modelA.zm12-modelA.zm11
 end
 
 function Zcase2!(Z::Vector{Float64}, SZ)
-    if SZ[3]!=24
-        println("MZ must be 24")
+    if SZ[3]!=33
+        println("MZ must be 33")
         exit(0)
     end
-    Z[1] = -0.025e-3
-    Z[2] = 0.0 #zm0
-    Z[3] = 0.025e-3
-    Z[4] = 0.05e-3
-    Z[5] = 0.075e-3
-    Z[6] = 0.1e-3 #zm1
-    Z[7] = 0.15e-3
-    Z[8] = 0.2e-3-modelA.pg_dpth
-    Z[9] = 0.2e-3 #zm2
-    Z[10] = 0.225e-3 
-    Z[11] = 0.25e-3
-    Z[12] = 0.3e-3
-    Z[13] = 0.35e-3-modelA.pg_dpth
-    Z[14] = 0.35e-3
-    Z[15] = 0.375e-3
-    Z[16]= 0.4e-3 #zm3
-    Z[17]= 0.45e-3
-    Z[18]= 0.5e-3-modelA.pg_dpth
-    Z[19]= 0.5e-3
-    Z[20]= 0.525e-3
-    Z[21]= 0.55e-3 #zm4
-    Z[22]= 0.575e-3
-    Z[23]= 0.6e-3  #zm5
-    Z[24]= 0.625e-3
+    p = 0.005e-3
+    Z[1] = modelA.zm0 - p
+    Z[2] = modelA.zm0
+    Z[3] = modelA.zm0 + p
+    Z[4] = modelA.zm1 - p
+    Z[5] = modelA.zm1
+    Z[6] = modelA.zm1 + p
+    Z[7] = modelA.zm2 - p
+    Z[8] = modelA.zm2
+    Z[9] = modelA.zm2 + p
+    Z[10]= modelA.zm3 - p
+    Z[11]= modelA.zm3
+    Z[12]= modelA.zm4
+    Z[13]= modelA.zm4 + p
+    Z[14]= modelA.zm5 - p
+    Z[15]= modelA.zm5
+    Z[16]= modelA.zm5 + p
+    Z[17]= modelA.zm6 - p
+    Z[18]= modelA.zm6
+    Z[19]= modelA.zm7
+    Z[20]= modelA.zm7 + p
+    Z[21]= modelA.zm8 - p
+    Z[22]= modelA.zm8
+    Z[23]= modelA.zm8 + p
+    Z[24]= modelA.zm9 - p
+    Z[25]= modelA.zm9 
+    Z[26]= modelA.zm10
+    Z[27]= modelA.zm10 + p
+    Z[28]= modelA.zm11 - p
+    Z[29]= modelA.zm11
+    Z[30]= modelA.zm11 + p
+    Z[31]= modelA.zm12 - p
+    Z[32]= modelA.zm12
+    Z[33]= modelA.zm12 + p
 end
 
 function Zcase3!(Z::Vector{Float64}, SZ, ox, dz)
@@ -309,8 +320,8 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz)
         Z[mz] = 2*Z[mz-1] - Z[mz-2]
     else
         #Zcase1!(Z, SZ)
-        #Zcase2!(Z, SZ)
-        Zcase3!(Z, SZ, ox, dz)
+        Zcase2!(Z, SZ)
+        #Zcase3!(Z, SZ, ox, dz)
     end
 
     for k in 2:mz-1
@@ -321,7 +332,7 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz)
         ΔZ[2] = 0.5*ΔZ[2]
         ΔZ[mz-1] = 0.5*ΔZ[mz-1]
     end
-    #println(Z)
+    println(Z)
     #println(ΔZ)
 end
 
@@ -363,9 +374,6 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     global mode = m_mode
 
     MX = MY = NXY + 2  # Number of CVs including boundaries
-    if mode==3
-        NZ = 121 #13
-    end
     MZ = NZ + 2
 
     if !(mode==1 ||mode==2 || mode==3 || mode==4)
@@ -387,7 +395,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     elseif mode==3 || mode==4
         dh = 1.2e-3 / NXY
     end
-    dh = round(dh,digits=8)
+    dh = round(dh,digits=8) #4.9999.... >> 5.0にしたい
 
     SZ = (MX, MY, MZ)
     Δh = (dh, dh, dh)
@@ -465,5 +473,6 @@ end
 
 #q3d(1, 25, 25, "pbicgstab")
 #q3d(2, 25, 25, "sor")
-q3d(3, 240, 121, "pbicgstab", "gs")
+#q3d(3, 240, 121, "pbicgstab", "gs")
 #q3d(4, 240, 120, "pbicgstab", "gs") 
+q3d(3, 240, 31, "pbicgstab", "gs")
