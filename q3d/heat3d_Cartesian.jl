@@ -70,7 +70,7 @@ end
 @param [in]     ω    加速係数
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
+function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F, tol)
 
     res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω)
     if res0==0.0
@@ -84,7 +84,7 @@ function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F)
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #println(n, " ", res)
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < Constant.tol
+        if res < tol
             println("Converged at ", n)
             return
         end
@@ -104,7 +104,7 @@ end
 @param [in]     ω    緩和係数
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
+function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F, tol)
 
     res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω)
     if res0==0.0
@@ -118,7 +118,7 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F)
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < Constant.tol
+        if res < tol
             println("Converged at ", n)
             return
         end
@@ -458,7 +458,8 @@ function PBiCGSTAB!(X::Array{Float64,3},
                     SZ,
              smoother::String,
                     F,
-                    mode)
+                    mode,
+                    tol)
    
     fill!(pcg_q, 0.0)
     res0 = CalcRK!(SZ, pcg_r, X, B, λ, mask, Δh)
@@ -516,7 +517,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
         @printf(F, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
         @printf(stdout, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
 
-        if res<Constant.tol
+        if res<tol
             println("Converged at ", itr)
             break
         end

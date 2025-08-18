@@ -300,7 +300,7 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     savefig(p, fname)
 end
 
-function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc, yc, fname, label::String="")
+function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc, yc, filename, label::String="")
     zs::Int=2
     ze::Int=SZ[3]-1
     i = find_i(xc, ox[1], Δh[1], SZ[1])
@@ -322,10 +322,13 @@ function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc
             label="",
             size=(600, 600)
     )
-    savefig(p, fname)
+    _fname = "$(filename).png"
+    savefig(p, _fname)
+
+    export_zline_csv(z_coords, s, filename)
 end
 
-function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, xc, yc, fname, label::String="")
+function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, xc, yc, filename, label::String="")
     zs::Int=2
     ze::Int=SZ[3]-1
 
@@ -348,5 +351,27 @@ function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, xc, yc, fname, label::Str
         label="",
         size=(600, 600)
         )
-    savefig(p, fname)
+    _fname = "$(filename).png"
+    savefig(p, _fname)
+end
+
+"""
+export_zline_csv(data, filename)
+"""
+function export_zline_csv(Z, d, filename::String)
+
+    _fname = "$(filename).csv"
+    
+    open(_fname, "w") do f
+        # ヘッダー
+        println(f, "Z [mm], Temperature [K]")
+        
+        # データ
+        for i in 1:length(d)
+            _str = @sprintf("%.14E, %.14E", Z[i], d[i])
+            println(f, "$_str")
+        end
+    end
+    
+    println("Z-line CSV saved: $_fname")
 end

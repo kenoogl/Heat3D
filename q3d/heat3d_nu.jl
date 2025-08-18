@@ -9,6 +9,8 @@ include("heat3d_NonUniformII.jl")
 include("../model/modelA.jl")
 include("plotter.jl")
 include("const.jl")
+include("convergence_history.jl")
+include("parse_log_residuals.jl")
 
 
 #=
@@ -71,7 +73,7 @@ function conditions(F, SZ, Δh, solver, smoother)
         @printf(F, "Solver: %s\n", solver)
     end
     @printf(F, "ItrMax : %e\n", Constant.ItrMax)
-    @printf(F, "ε      : %e\n", Constant.tol)
+    @printf(F, "ε      : %e\n", itr_tol)
     @printf(F, "θ_amb  : %e\n", Constant.θ_amb)
     @printf(F, "θ_pcb  : %e\n", Constant.θ_pcb)
     @printf(F, "HT_top : %e\n", Constant.HT_top)
@@ -102,6 +104,16 @@ function setMatOuter!(λ::Array{Float64,3}, SZ)
 end
 
 
+function preprocess!(SZ, λ, Z, ΔZ, ox, Δh, ID)
+    
+    genZ!(Z, ΔZ, SZ, ox, Δh[3])
+
+    if mode==3 || mode==4
+        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
+        modelA.setLambda!(λ, SZ, ID)
+        setMatOuter!(λ, SZ)
+    end
+end
 
 #= 
 @param [in] SZ       内部セル数
@@ -110,7 +122,9 @@ end
 @param [in] solver   ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother ["jacobi", "gs", ""]
 =#
-function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
+function main(SZ, ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
+    # 収束履歴の初期化
+    conv_data = ConvergenceData(solver, smoother)
 
     z_st::Int64=0
     z_ed::Int64=0
@@ -125,24 +139,6 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     elseif mode==3 
         z_st = 3
         z_ed = SZ[3]-1 
-    end
-
-    λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
-    λ .= 1.0 # default
-
-    ID = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
-
-
-    if mode==3 || mode==4
-        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
-        modelA.setLambda!(λ, SZ, ID)
-        setMatOuter!(λ, SZ)
-    end
-    
-    if mode==3
-        plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
-    elseif mode==4
-        plot_slice_xz(1, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
     end
 
     if mode==1
@@ -164,7 +160,6 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     setMask!(mask, SZ)
     #plot_slice2(mask, SZ, "mask.png")
 
-
     wk = zeros(Float64, SZ[1], SZ[2], SZ[3])
 
     if solver=="pbicgstab"
@@ -183,39 +178,39 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
 
     if solver=="sor"
         if mode==1
-            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F)
+            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
         elseif mode==2
-            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==3
-            NonUniformII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+            NonUniformII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==4
-            CartesianII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F)
+            CartesianII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
         end
     elseif solver=="jacobi"
         if mode==1
-            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F)
+            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
         elseif mode==2
-            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==3
-            NonUniformII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F)
+            NonUniformII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==4
-            CartesianII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F)
+            CartesianII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
         end
     elseif solver=="pbicgstab"
         if mode==1
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode, itr_tol)
         elseif mode==2
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode)
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==3
             NonUniformII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode)
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==4
             CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode)
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode, itr_tol)
         end
     else
         println("solver error")
@@ -227,6 +222,14 @@ function main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
     @printf(F, "θmin=%e  θmax=%e  L2 norm of θ=%e\n", min_val, max_val, norm(s,2))
 
     close(F)
+    
+    # ログファイルから残差データを解析してconv_dataに追加
+    if solver == "pbicgstab" || solver == "sor" || solver == "jacobi"
+        parse_residuals_from_log!(conv_data, "log.txt")
+    end
+    
+    # 収束履歴データを返す
+    return conv_data
 end
 
 function Zcase1!(Z::Vector{Float64}, SZ)
@@ -332,7 +335,7 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz)
         ΔZ[2] = 0.5*ΔZ[2]
         ΔZ[mz-1] = 0.5*ΔZ[mz-1]
     end
-    println(Z)
+    #println(Z)
     #println(ΔZ)
 end
 
@@ -370,8 +373,9 @@ end
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother  ["jacobi", "gs", ""]
 =#
-function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String="")
+function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String="", epsilon::Float64=1.0e-6)
     global mode = m_mode
+    global itr_tol = epsilon
 
     MX = MY = NXY + 2  # Number of CVs including boundaries
     MZ = NZ + 2
@@ -401,8 +405,8 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     Δh = (dh, dh, dh)
     ox = (0.0, 0.0, 0.0) #原点を仮定
 
-    println(SZ)
-    println(Δh)
+    println(SZ, "  Itr.ε= ", itr_tol)
+    #println(Δh)
 
     if mode==1 || mode==4
         Z = zeros(Float64, SZ[3]+1)
@@ -413,7 +417,18 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     ΔZ= zeros(Float64, SZ[3]-1)
     #@show typeof(Z)
 
-    genZ!(Z, ΔZ, SZ, ox, Δh[3])
+    λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
+    λ .= 1.0 # default
+
+    ID = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
+
+    @time preprocess!(SZ, λ, Z, ΔZ, ox, Δh, ID)
+
+    if mode==3
+        plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
+    elseif mode==4
+        plot_slice_xz(1, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
+    end
 
     if mode<=2
         exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -430,7 +445,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
     θ .= Constant.θ_amb # 初期温度設定
 
-    @time main(SZ, ox, Δh, θ, Z, ΔZ, solver, smoother)
+    @time conv_data = main(SZ, ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
 
     
     if mode==1 || mode==2
@@ -456,8 +471,8 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         plot_slice_xy_nu(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
         plot_slice_xy_nu(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
         plot_slice_xy_nu(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
-        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr.png", "Center")
-        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv.png", "TSV")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr", "Center")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv", "TSV")
     else
         plot_slice_xz(2, θ, Z, 0.3e-3, SZ, ox, Δh, "temp4_xz_y=0.3.png")
         plot_slice_xz(2, θ, Z, 0.4e-3, SZ, ox, Δh, "temp4_xz_y=0.4.png")
@@ -465,8 +480,43 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         plot_slice_xy(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.18.png")
         plot_slice_xy(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.33.png")
         plot_slice_xy(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.48.png")
-        plot_line_z(θ, SZ, ox, Δh, 0.6e-3, 0.6e-3, "temp4Z_ctr.png", "Center")
-        plot_line_z(θ, SZ, ox, Δh, 0.4e-3, 0.4e-3, "temp4Z_tsv.png", "TSV")
+        plot_line_z(θ, SZ, ox, Δh, 0.6e-3, 0.6e-3, "temp4Z_ctr", "Center")
+        plot_line_z(θ, SZ, ox, Δh, 0.4e-3, 0.4e-3, "temp4Z_tsv", "TSV")
+    end
+    
+    # 収束履歴の出力（反復解法の場合のみ）
+    if solver == "pbicgstab" || solver == "sor" || solver == "jacobi"
+        # 収束グラフとCSV出力
+        conv_filename = "convergence_$(solver)_mode$(mode)_$(NXY)x$(NZ)"
+        if !isempty(smoother)
+            conv_filename *= "_$(smoother)"
+        end
+        
+        # プロットとCSV出力
+        try
+            plot_convergence_curve(conv_data, "$(conv_filename).png", target_tol=itr_tol, show_markers=false)
+            export_convergence_csv(conv_data, "$(conv_filename).csv")
+        catch e
+            println("Error in convergence history output: $e")
+        end
+        
+        # 収束情報の表示
+        info = get_convergence_info(conv_data)
+        if !isempty(info)
+            println("\n=== Convergence Information ===")
+            println("Mode: $mode, Grid: $(NXY)x$(NZ)")
+            println("Solver: $(info["solver"]), Smoother: $(info["smoother"])")
+            println("Iterations: $(info["iterations"])")
+            initial_res_str = @sprintf("%.6E", info["initial_residual"])
+            final_res_str = @sprintf("%.6E", info["final_residual"])
+            conv_rate_str = @sprintf("%.6E", info["convergence_rate"])
+            reduction_str = @sprintf("%.2f", info["reduction_factor"])
+            println("Initial residual: $initial_res_str")
+            println("Final residual: $final_res_str")
+            println("Residual reduction factor: $conv_rate_str")
+            println("Order reduction: $reduction_str")
+            println("===============================")
+        end
     end
 
 end
@@ -475,4 +525,4 @@ end
 #q3d(2, 25, 25, "sor")
 #q3d(3, 240, 121, "pbicgstab", "gs")
 #q3d(4, 240, 120, "pbicgstab", "gs") 
-q3d(3, 240, 31, "pbicgstab", "gs")
+q3d(3, 240, 31, "pbicgstab", "gs", 1.0e-4)

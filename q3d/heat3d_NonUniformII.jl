@@ -158,7 +158,7 @@ end
 @param [in]     z_ed Zループ終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F)
+function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
 
     res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
     if res0==0.0
@@ -172,7 +172,7 @@ function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F)
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #println(n, " ", res)
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < Constant.tol
+        if res < tol
             println("Converged at ", n)
             return
         end
@@ -335,7 +335,7 @@ end
 @param [in]     z_ed Zループ終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F)
+function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
 
     res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
     if res0==0.0
@@ -349,7 +349,7 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F)
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
-        if res < Constant.tol
+        if res < tol
             println("Converged at ", n)
             return
         end
@@ -538,7 +538,8 @@ function PBiCGSTAB!(X::Array{Float64,3},
                  z_ed::Int,
              smoother::String,
                     F,
-                    mode)
+                    mode,
+                    tol)
    
     fill!(pcg_q, 0.0)
     res0 = CalcRK!(SZ, pcg_r, X, B, λ, mask, Δh, Z, ΔZ, z_st, z_ed)
@@ -592,10 +593,10 @@ function PBiCGSTAB!(X::Array{Float64,3},
         res = sqrt(Fdot1(pcg_r, SZ, z_st, z_ed))/((SZ[1]-2)*(SZ[2]-2)*(z_ed-z_st+1))
         res /= res0
         #println(itr, " ", res)
-        @printf(F, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
+        @printf(F, "%10d %24.14E\n", itr, res)
         @printf(stdout, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
 
-        if res<Constant.tol
+        if res<tol
             println("Converged at ", itr)
             break
         end
