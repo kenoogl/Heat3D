@@ -579,8 +579,8 @@ function model_test(mode::Int64, NXY::Int64, NZ::Int64=13)
     end
     MZ = NZ + 2 # mode=1のときNZはセル数、mode=2のときNZはセル界面数
 
-    dx::Float64 = 1.2 / NXY
-    dy::Float64 = 1.2 / NXY
+    dx::Float64 = 1.2e-3 / NXY
+    dy::Float64 = 1.2e-3 / NXY
     dz::Float64 = zm12 / NZ
     Δh = (dx, dy, dz) 
     ox = (0.0, 0.0, 0.0)
@@ -632,14 +632,16 @@ end
 function id_yz(d::Array{UInt8,3}, x, ox, Δh, SZ, Z, fname)
     i = find_i(x, ox[1], Δh[1], SZ[1])
     s = d[i, 1:SZ[2], 1:SZ[3]]
-    y_coords = [ox[2] + Δh[2] * (j - 1.5) for j in 1:SZ[2]]
-    z_coords = [Z[k] for k in 1:SZ[3]]
+    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*1000 for j in 1:SZ[2]]
+    z_coords = [Z[k]*1000 for k in 1:SZ[3]]
     p = heatmap( z_coords, y_coords, s, 
         clims=(1,length(Fcolor)), 
-        title="ID x=$x (x_index=$i)",
+        title="ID x=$(x*1000) [mm] (x_index=$i)",
+        xlabel="Z-coordinate [mm]",
+        ylabel="Y-coordinate [mm]",
         c = Fcolor,
         colorbar=false,
-        size = (300,600),
+        size = (500,600),
         aspect_ratio=:equal )
     savefig(p, fname)
 end
@@ -713,7 +715,7 @@ function plot_slice3(d::Array{UInt8,3}, x, SZ, ox, Δh, Z::Vector{Float64}, fnam
                 xlabel="Z", 
                 ylabel="Y", 
                 title="YZ-sect. (X=$x, i=$i, $label) $(SZ[2])x$(length(Z)-2)", 
-                size=(300, 600),
+                size=(400, 600),
                 aspect_ratio=:equal)
     savefig(p, fname)
     
@@ -725,7 +727,7 @@ end # end of moduleA
 if abspath(PROGRAM_FILE) == @__FILE__
     using .modelA
     model_test(1,240,120)
-    model_test(3,240)
+    #model_test(3,240)
     #model_test(1,480,240)
 end
 

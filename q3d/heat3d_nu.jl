@@ -521,8 +521,15 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
 end
 
+if abspath(PROGRAM_FILE) == @__FILE__
+  q3d(3, 240, 31, "pbicgstab", "gs", 1.0e-4)
+  #q3d(3, 120, 31, "pbicgstab", "gs", 1.0e-4)
+  #q3d(4, 240, 120, "pbicgstab", "gs", 1.0e-4) 
+  #q3d(1, 25, 25, "pbicgstab", "gs", 1.0e-8)
+  #q3d(2, 25, 25, "pbicgstab", "gs", 1.0e-8)
+end
 #q3d(1, 25, 25, "pbicgstab")
 #q3d(2, 25, 25, "sor")
 #q3d(3, 240, 121, "pbicgstab", "gs")
-#q3d(4, 240, 120, "pbicgstab", "gs") 
-q3d(3, 240, 31, "pbicgstab", "gs", 1.0e-4)
+#q3d(4, 240, 120, "pbicgstab", "gs", 1.0e-4) 
+#q3d(3, 240, 31, "pbicgstab", "gs", 1.0e-4)

@@ -78,6 +78,8 @@ function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fnam
 
     j = find_j(y, ox[2], Δh[2], SZ[2])
     s = d[xs:xe, j, zs:ze]
+    #x_coords = [(ox[1] + Δh[1] * (i - 1.5)) for i in xs:xe]
+    #z_coords = [(ox[3] + Δh[3] * (k - 1.5)) for k in zs:ze]
     x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
     z_coords = [(ox[3] + Δh[3] * (k - 1.5))*1000 for k in zs:ze]
 
@@ -100,9 +102,11 @@ function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fnam
         c=:thermal, 
         colorbar_ticks=(auto_tick_values, auto_tick_labels),
         colorbar_title="Temperature [K]",
-        xlabel="Z-coordinate", 
-        ylabel="X-coordinate", 
-        title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
+        xlims=(0.0, 0.6),
+        ylims=(0.0, 1.2),
+        xlabel="Z-coordinate [mm]", 
+        ylabel="X-coordinate [mm]", 
+        #title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
         size=(800, 600),
         aspect_ratio=:equal)
     savefig(p, fname)
@@ -159,10 +163,12 @@ function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, l
     p = contour(x_coords, y_coords, s, 
         fill=true, 
         c=:thermal,  
+        xlims=(0.0, 1.2),
+        ylims=(0.0, 1.2),
         colorbar_ticks=(auto_tick_values, auto_tick_labels),
         colorbar_title="Temperature [K]",
-        xlabel="X-coordinate", 
-        ylabel="Y-coordinate", 
+        xlabel="X-coordinate [mm]", 
+        ylabel="Y-coordinate [mm]", 
         title=title_str, 
         size=(1000, 600),
         aspect_ratio=:equal)
@@ -202,10 +208,10 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
     j = find_j(y, ox[2], Δh[2], SZ[2])
     s = d[xs:xe, j, zs:ze]
     
-    # X方向座標軸（境界含む全セル）
     x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
-    # Z方向座標軸（境界含む全セル、NonUniform）
     z_coords = [Z[k]*1000 for k in zs:ze]
+    #x_coords = [(ox[1] + Δh[1] * (i - 1.5)) for i in xs:xe]
+    #z_coords = [Z[k] for k in zs:ze]
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -225,11 +231,13 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
     p = contour(z_coords, x_coords, s, 
                 fill=true, 
                 c=:thermal, 
+                xlims=(0.0, 1.0),
+                ylims=(0.0, 1.0),
                 colorbar_ticks=(auto_tick_values, auto_tick_labels),
-                colorbar_title="Thermal Diffusion [m^2/s]",
-                xlabel="Z-coordinate", 
-                ylabel="X-coordinate", 
-                title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
+                #colorbar_title="Thermal Diffusion [m^2/s]",
+                xlabel="Z-coordinate [mm]", 
+                ylabel="X-coordinate [mm]", 
+                #title="Cross-section at Y=$(y*1000) [mm] (j=$j) Uniform $label", 
                 size=(800, 600),
                 aspect_ratio=:equal)
      
@@ -314,7 +322,7 @@ function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc
     println("At ($(xc*1000), $(yc*1000) [mm]: min=", min_val, " max=", max_val)
 
     p = plot(z_coords, s, 
-             marker=:circle, 
+            marker=:circle, 
             markersize=3,
             xlabel="Z-coordinate [mm]", 
             ylabel="Temperature [K]", 
@@ -368,7 +376,7 @@ function export_zline_csv(Z, d, filename::String)
         
         # データ
         for i in 1:length(d)
-            _str = @sprintf("%.14E, %.14E", Z[i], d[i])
+            _str = @sprintf("%f, %f", Z[i], d[i])
             println(f, "$_str")
         end
     end
