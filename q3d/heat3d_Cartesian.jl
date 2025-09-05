@@ -462,7 +462,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
                     tol)
    
     fill!(pcg_q, 0.0)
-    res0 = CalcRK!(SZ, pcg_r, X, B, λ, mask, Δh)
+    res0 = CalcRK!(pcg_r, X, B, λ, mask, Δh)
     println("Inital residual = ", res0)
     copy!(pcg_r0, pcg_r)
 
@@ -473,7 +473,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
     beta::Float64 = 0.0
 
     for itr in 1:Constant.ItrMax
-        rho = Fdot2(pcg_r, pcg_r0, SZ) # 非計算部分はゼロのこと
+        rho = Fdot2(pcg_r, pcg_r0) # 非計算部分はゼロのこと
 
         if abs(rho) < Constant.FloatMin
             itr = 0
@@ -490,16 +490,16 @@ function PBiCGSTAB!(X::Array{Float64,3},
         fill!(pcg_p_, 0.0)
         Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, SZ, Δh, smoother)
 
-        CalcAX!(pcg_q, pcg_p_, SZ, Δh, λ, mask)
-        alpha = rho / Fdot2(pcg_q, pcg_r0, SZ)
+        CalcAX!(pcg_q, pcg_p_, Δh, λ, mask)
+        alpha = rho / Fdot2(pcg_q, pcg_r0)
         r_alpha = -alpha
         Triad!(pcg_s, pcg_q, pcg_r, r_alpha, SZ)
 
         fill!(pcg_s_, 0.0)
         Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, SZ, Δh, smoother);
 
-        CalcAX!(pcg_t_, pcg_s_, SZ, Δh, λ, mask)
-        omega = Fdot2(pcg_t_, pcg_s, SZ) / Fdot1(pcg_t_, SZ)
+        CalcAX!(pcg_t_, pcg_s_, Δh, λ, mask)
+        omega = Fdot2(pcg_t_, pcg_s) / Fdot1(pcg_t_)
         r_omega = -omega
 
         BICG2!(X, pcg_p_, pcg_s_, alpha , omega, SZ)
@@ -511,7 +511,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
    
 
         Triad!(pcg_r, pcg_t_, pcg_s, r_omega, SZ)
-        res = sqrt(Fdot1(pcg_r, SZ))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
+        res = sqrt(Fdot1(pcg_r))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
         res /= res0
         #println(itr, " ", res)
         @printf(F, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
@@ -530,7 +530,6 @@ end
 
 #=
 @brief 残差ベクトルの計算
-@param [in]     SZ   配列寸法
 @param [out]    r    残差ベクトル
 @param [in]     p    解ベクトル
 @param [in]     b    右辺ベクトル
@@ -539,14 +538,14 @@ end
 @param [in]     Δh   セル幅
 @ret                 セルあたりの残差RMS
 =#
-function CalcRK!(SZ, 
+function CalcRK!(
                 r::Array{Float64,3}, 
                 p::Array{Float64,3}, 
                 b::Array{Float64,3},
                 λ::Array{Float64,3}, 
                 m::Array{Float64,3}, 
                 Δh)
-
+    SZ = size(r)
     res::Float64 = 0.0
     dx0::Float64 = Δh[1]
     dy0::Float64 = Δh[2]
@@ -579,11 +578,10 @@ end
 #=
 @brief ベクトルの内積
 @param [in]     x    ベクトル
-@param [in]     SZ   配列長
-@ret            　    内積
+@ret                 内積
 =#
-function Fdot1(x::Array{Float64,3}, SZ)
-
+function Fdot1(x::Array{Float64,3})
+    SZ = size(x)
     y::Float64 = 0.0
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         y += x[i,j,k] * x[i,j,k]
@@ -597,11 +595,10 @@ end
 @brief 2ベクトルの内積
 @param [in]     x    ベクトル
 @param [in]     y    ベクトル
-@param [in]     SZ   配列長
-@ret            　　   内積
+@ret                 内積
 =#
-function Fdot2(x::Array{Float64,3}, y::Array{Float64,3}, SZ)
-
+function Fdot2(x::Array{Float64,3}, y::Array{Float64,3})
+    SZ = size(x)
     xy::Float64 = 0.0
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         xy += x[i,j,k] * y[i,j,k]
@@ -684,11 +681,10 @@ end
 =#
 function CalcAX!(ap::Array{Float64,3}, 
                   p::Array{Float64,3}, 
-                  SZ,
                   Δh,
                   λ::Array{Float64,3}, 
                   m::Array{Float64,3})
-
+    SZ = size(p)
     dx0 = Δh[1]
     dy0 = Δh[2]
     dz0 = Δh[3]
@@ -753,6 +749,66 @@ function BICG2!(z::Array{Float64,3},
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         z[i,j,k] += a * x[i,j,k] + b * y[i,j,k]
     end
+end
+
+#=
+@brief CG反復
+@param [in,out] X      解ベクトル
+@param [in]     B      RHSベクトル
+@param [in]     p,r,ax,ap   ワークベクトル
+@param [in]     λ      熱伝導率
+@param [in]     mask   マスク配列
+@param [in]     F      ファイルディスクリプタ
+@ret                   セルあたりの残差RMS
+=#
+function CG!(X::Array{Float64,3}, 
+             B::Array{Float64,3},
+             p::Array{Float64,3},
+             r::Array{Float64,3},
+            ax::Array{Float64,3},
+            ap::Array{Float64,3},
+             λ::Array{Float64,3},
+          mask::Array{Float64,3},
+            Δh,
+            F,
+            mode,
+            tol)
+    sd=false
+    SZ = size(X)
+    res0 = CalcRK!(r, X, B, λ, mask, Δh)
+    p .= r
+
+    println("Inital residual = ", res0)
+
+    for itr in 1:Constant.ItrMax
+        CalcAX!(ap, p, Δh, λ, mask)
+        alpha = Fdot2(p, r) / Fdot2(p, ap)
+
+        for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+            X[i,j,k] += alpha *  p[i,j,k]
+            r[i,j,k] -= alpha * ap[i,j,k]
+        end
+
+        res = sqrt(Fdot1(r))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
+        res /= res0
+
+        @printf(F, "%10d %24.14E\n", itr, res)
+        @printf(stdout, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
+
+        if res<tol
+            println("Converged at ", itr)
+            break
+        end
+
+        if sd==false # CG method
+            beta = -Fdot2(r, ap) / Fdot2(p, ap)
+            p .= r .+ beta * p
+        else
+            p .= r # SD method
+        end
+
+    end # itr
+    @printf(stdout, "\n")
 end
 
 end # end of module Cartesian

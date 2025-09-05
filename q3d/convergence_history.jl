@@ -7,7 +7,7 @@ ConvergenceData
 反復解法の収束履歴を保存する構造体
 
 Fields:
-- solver_name: 解法名 ("sor", "jacobi", "pbicgstab")
+- solver_name: 解法名 ("sor", "jacobi", "pbicgstab", "cg")
 - smoother_name: スムーザー名 ("gs", "jacobi", "")
 - iterations: 反復回数の配列
 - residuals: 残差の配列

@@ -51,13 +51,13 @@ end
 #=
 @brief XZ断面
 @param [in]     region 1--全領域, 2--内部, 3-- trim
-@param [in]     ｄ      解ベクトル
+@param [in]     d      解ベクトル
 @param [in]     SZ     配列長
 @param [in]     ox     原点座標
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fname, label::String="")
+function plot_slice_xz(region::Int, mode, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fname, label::String="")
     xs::Int=1
     xe::Int=SZ[1]
     zs::Int=1
@@ -78,11 +78,14 @@ function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fnam
 
     j = find_j(y, ox[2], Δh[2], SZ[2])
     s = d[xs:xe, j, zs:ze]
-    #x_coords = [(ox[1] + Δh[1] * (i - 1.5)) for i in xs:xe]
-    #z_coords = [(ox[3] + Δh[3] * (k - 1.5)) for k in zs:ze]
-    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
-    z_coords = [(ox[3] + Δh[3] * (k - 1.5))*1000 for k in zs:ze]
-
+    factor::Float64=0.0
+    if mode==1
+        factor = 1.0
+    else
+        factor = 1000.0
+    end
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*factor for i in xs:xe]
+    z_coords = [(ox[3] + Δh[3] * (k - 1.5))*factor for k in zs:ze]
     min_val = minimum(s)
     max_val = maximum(s)
     n_ticks = 6
@@ -102,7 +105,7 @@ function plot_slice_xz(region::Int, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fnam
         c=:thermal, 
         colorbar_ticks=(auto_tick_values, auto_tick_labels),
         colorbar_title="Temperature [K]",
-        xlims=(0.0, 0.6),
+        xlims= (mode==4) ? (0.0, 0.6) : (0.0, 1.2),
         ylims=(0.0, 1.2),
         xlabel="Z-coordinate [mm]", 
         ylabel="X-coordinate [mm]", 
@@ -115,13 +118,13 @@ end
 
 #=
 @brief XZ断面
-@param [in]     ｄ      解ベクトル
+@param [in]     d      解ベクトル
 @param [in]     SZ     配列長
 @param [in]     ox     原点座標
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, label::String="")
+function plot_slice_xy(region, mode, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, label::String="")
     xs::Int=1
     xe::Int=SZ[1]
     ys::Int=1
@@ -142,9 +145,14 @@ function plot_slice_xy(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, l
     
     k = find_k(Z, zc, SZ[3], 4)
     s = d[xs:xe, ys:ye, k]
-    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
-    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*1000 for j in ys:ye]
-
+    factor::Float64=0.0
+    if mode==1
+        factor = 1.0
+    else
+        factor = 1000.0
+    end
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*factor for i in xs:xe]
+    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*factor for j in ys:ye]
     min_val = minimum(s)
     max_val = maximum(s)
     n_ticks = 6
