@@ -474,7 +474,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
                     tol)
    
     SZ = size(X)
-    fill!(pcg_q, 0.0)
+    pcg_q .= 0.0 #fill!(pcg_q, 0.0)
     res0 = CalcRK!(pcg_r, X, B, λ, mask, Δh)
     println("Inital residual = ", res0)
     pcg_r0 .= pcg_r #copy!(pcg_r0, pcg_r)
@@ -500,7 +500,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
             BiCG1!(pcg_p, pcg_r, pcg_q, beta, omega)
         end
 
-        fill!(pcg_p_, 0.0)
+        pcg_p_ .= 0.0 #fill!(pcg_p_, 0.0)
         Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, Δh, smoother)
 
         CalcAX!(pcg_q, pcg_p_, Δh, λ, mask)
@@ -508,7 +508,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
         r_alpha = -alpha
         Triad!(pcg_s, pcg_q, pcg_r, r_alpha)
 
-        fill!(pcg_s_, 0.0)
+        pcg_s_ .= 0.0 #fill!(pcg_s_, 0.0)
         Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, Δh, smoother);
 
         CalcAX!(pcg_t_, pcg_s_, Δh, λ, mask)
@@ -516,12 +516,14 @@ function PBiCGSTAB!(X::Array{Float64,3},
         r_omega = -omega
 
         BICG2!(X, pcg_p_, pcg_s_, alpha , omega)
+
+        #=
         if mode==4
             # boundary_condition4!(X)
         else
             boundary_condition!(X, ox, Δh)
         end
-   
+        =#
 
         Triad!(pcg_r, pcg_t_, pcg_s, r_omega)
         res = sqrt(Fdot1(pcg_r))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))

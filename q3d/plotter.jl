@@ -57,7 +57,8 @@ end
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice_xz(region::Int, mode, d::Array{Float64,3}, Z, y, SZ, ox, Δh, fname, label::String="")
+function plot_slice_xz(region::Int, mode, d::Array{Float64,3}, Z, y, ox, Δh, fname, label::String="")
+    SZ = size(d)
     xs::Int=1
     xe::Int=SZ[1]
     zs::Int=1
@@ -124,7 +125,8 @@ end
 @param [in]     Δh     X,Y方向格子間隔（Uniform）
 @param [in]     fname  ファイル名
 =#
-function plot_slice_xy(region, mode, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fname, label::String="")
+function plot_slice_xy(region, mode, d::Array{Float64,3}, zc, ox, Δh, Z, fname, label::String="")
+    SZ = size(d)
     xs::Int=1
     xe::Int=SZ[1]
     ys::Int=1
@@ -195,7 +197,8 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice_xz_nu(region, d::Array{Float64,3}, y, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+    SZ = size(d)
     xs::Int=1
     xe::Int=SZ[1]
     zs::Int=1
@@ -262,7 +265,8 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+    SZ = size(d)
     xs::Int=1
     xe::Int=SZ[1]
     ys::Int=1
@@ -316,7 +320,8 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     savefig(p, fname)
 end
 
-function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc, yc, filename, label::String="")
+function plot_line_z_nu(d::Array{Float64,3}, ox, Δh, Z::Vector{Float64}, xc, yc, filename, label::String="")
+    SZ = size(d)
     zs::Int=2
     ze::Int=SZ[3]-1
     i = find_i(xc, ox[1], Δh[1], SZ[1])
@@ -344,7 +349,8 @@ function plot_line_z_nu(d::Array{Float64,3}, SZ, ox, Δh, Z::Vector{Float64}, xc
     export_zline_csv(z_coords, s, filename)
 end
 
-function plot_line_z(d::Array{Float64,3}, SZ, ox, Δh, xc, yc, filename, label::String="")
+function plot_line_z(d::Array{Float64,3}, ox, Δh, xc, yc, filename, label::String="")
+    SZ = size(d)
     zs::Int=2
     ze::Int=SZ[3]-1
 

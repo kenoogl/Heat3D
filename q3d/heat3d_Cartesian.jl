@@ -16,11 +16,11 @@ include("const.jl")
 #=
 @brief 厳密解
 @param [in]     e      解ベクトル
-@param [in]     SZ     配列長
 @param [in]     ox     原点座標
 @param [in]     Δh     セル幅
 =#
-function exact_solution!(e::Array{Float64,3}, SZ, ox, Δh)
+function exact_solution!(e::Array{Float64,3}, ox, Δh)
+    SZ = size(e)
     r2 = sqrt(2.0)
 
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -38,8 +38,8 @@ end
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 =#
-function boundary_condition!(p::Array{Float64,3}, SZ, ox, Δh)
-
+function boundary_condition!(p::Array{Float64,3}, ox, Δh)
+    SZ = size(p)
     for j in 2:SZ[2]-1, i in 2:SZ[1]-1
         x = ox[1] + Δh[1]*(i-1.5)
         y = ox[2] + Δh[2]*(j-1.5)
@@ -62,7 +62,6 @@ end
 #=
 @brief SOR法による求解
 @param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    RHSベクトル
 @param [in]     mask マスク配列
@@ -70,9 +69,9 @@ end
 @param [in]     ω    加速係数
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F, tol)
-
-    res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω)
+function solveSOR!(θ, λ, b, mask, Δh, ω, F, tol)
+    SZ = size(b)
+    res0 = resSOR(θ, λ, b, mask, Δh, ω)
     if res0==0.0
         res0 = 1.0
     end
@@ -80,7 +79,7 @@ function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, F, tol)
 
     n = 0
     for n in 1:Constant.ItrMax
-        res = sor!(θ, SZ, λ, b, mask, Δh, ω) / res0
+        res = sor!(θ, λ, b, mask, Δh, ω) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #println(n, " ", res)
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
@@ -95,7 +94,6 @@ end
 #=
 @brief 緩和ヤコビ法による求解
 @param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    RHSベクトル
 @param [in]     mask マスク配列
@@ -104,9 +102,9 @@ end
 @param [in]     ω    緩和係数
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F, tol)
+function solveJACOBI!(θ, λ, b, mask, wk, Δh, ω, F, tol)
 
-    res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω)
+    res0 = resJCB(θ, λ, b, mask, Δh, ω)
     if res0==0.0
         res0 = 1.0
     end
@@ -114,7 +112,7 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, F, tol)
 
     n = 0
     for n in 1:Constant.ItrMax
-        res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, wk) / res0
+        res = jacobi!(θ, λ, b, mask, Δh, ω, wk) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
@@ -138,13 +136,12 @@ end
 @ret                 1セルあたりの残差RMS
 =#
 function resSOR(p::Array{Float64,3}, 
-                SZ, 
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
                 m::Array{Float64,3}, 
                 Δh, 
                 ω::Float64)
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
@@ -179,7 +176,6 @@ end
 #=
 @brief 緩和Jacobi法の残差
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -188,13 +184,12 @@ end
 @ret                 1セルあたりの残差RMS
 =#
 function resJCB(p::Array{Float64,3},
-                SZ,
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
                 m::Array{Float64,3}, 
                 Δh, 
                 ω::Float64)
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
@@ -239,14 +234,13 @@ end
 @ret                 1セルあたりの残差RMS
 =#
 function jacobi!(p::Array{Float64,3},
-                 SZ,
                  λ::Array{Float64,3}, 
                  b::Array{Float64,3},
                  m::Array{Float64,3}, 
                  Δh, 
                  ω::Float64,
                 wk::Array{Float64,3})
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
@@ -288,7 +282,6 @@ end
 #=
 @brief SOR法
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -297,13 +290,12 @@ end
 @ret                 1セルあたりの残差RMS
 =#
 function sor!(p::Array{Float64,3}, 
-              SZ, 
               λ::Array{Float64,3}, 
               b::Array{Float64,3},
               m::Array{Float64,3}, 
               Δh, 
               ω::Float64)
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
@@ -341,7 +333,6 @@ end
 #=
 @brief RB-SOR法のカーネル
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -351,14 +342,13 @@ end
 @ret                 残差2乗和
 =#
 function rbsor_core!(p::Array{Float64,3}, 
-                     SZ, 
                      λ::Array{Float64,3}, 
                      b::Array{Float64,3},
                      m::Array{Float64,3}, 
                      Δh, 
                      ω::Float64, 
                      color::Int)
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
@@ -398,7 +388,6 @@ end
 #=
 @brief RB-SOR法
 @param [in,out] θ    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     mask マスク配列
@@ -407,18 +396,17 @@ end
 @ret                 セルあたりの残差RMS
 =#
 function rbsor!(θ::Array{Float64,3}, 
-                SZ, 
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
              mask::Array{Float64,3}, 
                 Δh, 
                 ω::Float64)
-
+    SZ = size(b)
     res::Float64 = 0.0
 
     # 2色のマルチカラー(Red&Black)のセットアップ
     for c in 0:1
-        r = rbsor_core!(θ, SZ, λ, b, mask, Δh, ω, c)
+        r = rbsor_core!(θ, λ, b, mask, Δh, ω, c)
         res += r
     end
     return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
@@ -433,7 +421,6 @@ end
 @param [in]     λ      熱伝導率
 @param [in]     mask   マスク配列
 @param [in]     Δh     セル幅
-@param [in]     SZ     配列長
 @param [in] 　　　　　　　　ω      加速係数
 @param [in] 　　　　　　　　ItrMax 前処理反復数
 @param [in] 　　　　　　　　smoother ["gs", "jacobi", ""]
@@ -455,16 +442,15 @@ function PBiCGSTAB!(X::Array{Float64,3},
                    wk::Array{Float64,3},
                    ox,
                     Δh,
-                    SZ,
              smoother::String,
                     F,
                     mode,
                     tol)
-   
-    fill!(pcg_q, 0.0)
+    SZ = size(X)
+    pcg_q .= 0.0 # fill!(pcg_q, 0.0)
     res0 = CalcRK!(pcg_r, X, B, λ, mask, Δh)
     println("Inital residual = ", res0)
-    copy!(pcg_r0, pcg_r)
+    pcg_r0 .= pcg_r #copy!(pcg_r0, pcg_r)
 
     rho_old::Float64 = 1.0
     alpha::Float64 = 0.0
@@ -481,36 +467,38 @@ function PBiCGSTAB!(X::Array{Float64,3},
         end
 
         if itr == 1
-            copy!(pcg_p, pcg_r)
+            pcg_p .= pcg_r #copy!(pcg_p, pcg_r)
         else
             beta = rho / rho_old * alpha / omega
-            BiCG1!(pcg_p, pcg_r, pcg_q, beta, omega, SZ)
+            BiCG1!(pcg_p, pcg_r, pcg_q, beta, omega)
         end
 
-        fill!(pcg_p_, 0.0)
-        Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, SZ, Δh, smoother)
+        pcg_p_ .= 0.0 #fill!(pcg_p_, 0.0)
+        Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, Δh, smoother)
 
         CalcAX!(pcg_q, pcg_p_, Δh, λ, mask)
         alpha = rho / Fdot2(pcg_q, pcg_r0)
         r_alpha = -alpha
-        Triad!(pcg_s, pcg_q, pcg_r, r_alpha, SZ)
+        Triad!(pcg_s, pcg_q, pcg_r, r_alpha)
 
-        fill!(pcg_s_, 0.0)
-        Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, SZ, Δh, smoother);
+        pcg_s_ .= 0.0 #fill!(pcg_s_, 0.0)
+        Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, Δh, smoother);
 
         CalcAX!(pcg_t_, pcg_s_, Δh, λ, mask)
         omega = Fdot2(pcg_t_, pcg_s) / Fdot1(pcg_t_)
         r_omega = -omega
 
-        BICG2!(X, pcg_p_, pcg_s_, alpha , omega, SZ)
+        BICG2!(X, pcg_p_, pcg_s_, alpha , omega)
+
+        #=
         if mode==4
             # boundary_condition4!(X, SZ)
         else
             boundary_condition!(X, SZ, ox, Δh)
         end
-   
+        =#
 
-        Triad!(pcg_r, pcg_t_, pcg_s, r_omega, SZ)
+        Triad!(pcg_r, pcg_t_, pcg_s, r_omega)
         res = sqrt(Fdot1(pcg_r))/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
         res /= res0
         #println(itr, " ", res)
@@ -621,9 +609,8 @@ function BiCG1!(p::Array{Float64,3},
                 r::Array{Float64,3}, 
                 q::Array{Float64,3}, 
              beta::Float64, 
-              omg::Float64, 
-                SZ)
-
+              omg::Float64)
+    SZ = size(p)
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         p[i,j,k] = r[i,j,k] + beta * (p[i,j,k] - omg * q[i,j,k])
     end
@@ -646,7 +633,6 @@ function Preconditioner!(xx::Array{Float64,3},
                           λ::Array{Float64,3}, 
                        mask::Array{Float64,3}, 
                          wk::Array{Float64,3}, 
-                         SZ,
                          Δh,
                    smoother::String)
 
@@ -656,15 +642,15 @@ function Preconditioner!(xx::Array{Float64,3},
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)
         for _ in 1:LCmax
-            res = jacobi!(xx, SZ, λ, bb, mask, Δh, 0.8, wk)
+            res = jacobi!(xx, λ, bb, mask, Δh, 0.8, wk)
         end
     elseif smoother=="gs"
         #P_SOR!(xx, bb, LCmax, SZ, λ, mask, Δh)
         for _ in 1:LCmax
-            res = sor!(xx, SZ, λ, bb, mask, Δh, 1.0)
+            res = sor!(xx, λ, bb, mask, Δh, 1.0)
         end
     else
-        copy!(xx, bb)
+        xx .= bb #copy!(xx, bb)
     end
 end
 
@@ -721,9 +707,8 @@ end
 function Triad!(z::Array{Float64,3}, 
                 x::Array{Float64,3}, 
                 y::Array{Float64,3}, 
-                a::Float64, 
-                SZ)
-
+                a::Float64)
+    SZ = size(z)
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         z[i,j,k] = a * x[i,j,k] + y[i,j,k]
     end
@@ -737,15 +722,13 @@ end
 !! @param [in]     x    ベクトル
 !! @param [in]     a    係数
 !! @param [in]     b    係数
-!! @param [in]     SZ   配列長
 =#
 function BICG2!(z::Array{Float64,3}, 
                 x::Array{Float64,3}, 
                 y::Array{Float64,3}, 
                 a::Float64, 
-                b::Float64, 
-                SZ)
-
+                b::Float64)
+    SZ = size(z)
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         z[i,j,k] += a * x[i,j,k] + b * y[i,j,k]
     end

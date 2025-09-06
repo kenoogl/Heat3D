@@ -1,0 +1,85 @@
+(27, 27, 27)  Itr.ε= 1.0e-6
+  0.000009 seconds
+min=0.0 max=0.9170445069335451
+Inital residual = 1582.284219491397
+         1     2.40508947689839E-01
+         2     1.46165349785233E-01
+         3     9.78249879681011E-02
+         4     7.54033459736528E-02
+         5     5.81134492372817E-02
+         6     4.75563088082562E-02
+         7     4.00331139378013E-02
+         8     3.37885803962649E-02
+         9     2.93933271255257E-02
+        10     2.55828114412849E-02
+        11     2.25514287344950E-02
+        12     2.01345059387801E-02
+        13     1.80469556619005E-02
+        14     1.64522601891698E-02
+        15     1.51170776995730E-02
+        16     1.39633989222921E-02
+        17     1.28607154356603E-02
+        18     1.16090867521456E-02
+        19     1.02036258985539E-02
+        20     8.53693060472117E-03
+        21     6.51452103906397E-03
+        22     4.39877050356250E-03
+        23     2.82811618905661E-03
+        24     2.05580946846792E-03
+        25     1.62023031855793E-03
+        26     1.24617306986757E-03
+        27     8.58336528665907E-04
+        28     5.70672966636309E-04
+        29     4.07082494025480E-04
+        30     2.86216824138950E-04
+        31     1.89028516182034E-04
+        32     1.27268224172464E-04
+        33     8.25028856083808E-05
+        34     4.72186743491280E-05
+        35     2.68539355891990E-05
+        36     1.49800386511593E-05
+        37     7.25880964279025E-06
+        38     3.22971524511011E-06
+        39     1.48626861449846E-06
+        40     5.14618676484147E-07
+Converged at 40
+
+Loaded 40 residual data points from log
+  0.731754 seconds (1.34 M allocations: 91.480 MiB, 1.44% gc time, 96.64% compilation time)
+min=0.013124875935062357 max=0.9132824919832327
+min=2.5074381818090963e-6 max=0.003762014950320247
+ L2 norm of θ-exact=0.11392981665720985
+Convergence plot saved: convergence_pbicgstab_mode1_25x25.png
+Convergence history CSV saved: convergence_pbicgstab_mode1_25x25.csv
+
+=== Convergence Information ===
+Mode: 1, Grid: 25x25
+Solver: pbicgstab, Smoother: 
+Iterations: 40
+Initial residual: 2.405089E-01
+Final residual: 5.146187E-07
+Residual reduction factor: 2.139707E-06
+Order reduction: 5.67
+===============================
+(7, 7, 7)  Itr.ε= 0.0001
+  0.000001 seconds
+min=0.0 max=0.6519536478257881
+Inital residual = 2961.672067539799
+Converged at 24
+Loaded 24 residual data points from log
+  0.057495 seconds (40.55 k allocations: 2.661 MiB, 98.91% compilation time)
+min=0.07826176075621999 max=0.6363507705512116
+min=3.369365071811958e-5 max=0.05316860030544929
+ L2 norm of θ-exact=0.2248368570289973
+Convergence plot saved: convergence_sor_mode1_5x5.png
+Convergence history CSV saved: convergence_sor_mode1_5x5.csv
+
+=== Convergence Information ===
+Mode: 1, Grid: 5x5
+Solver: sor, Smoother: 
+Iterations: 24
+Initial residual: 1.295667E+00
+Final residual: 7.537489E-05
+Residual reduction factor: 5.817460E-05
+Order reduction: 4.24
+===============================

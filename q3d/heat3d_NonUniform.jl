@@ -133,7 +133,8 @@ end
 @param [in]     z_ed Zループ終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+function solveSOR!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+    SZ = size(θ)
 
     res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
     if res0==0.0
@@ -296,7 +297,8 @@ end
 @param [in]     z_ed Zループ終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+function solveJACOBI!(θ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+    SZ = size(θ)
 
     res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
     if res0==0.0

@@ -12,168 +12,6 @@ include("const.jl")
 include("convergence_history.jl")
 include("parse_log_residuals.jl")
 
-# モード設定構造体
-struct ModeConfig
-  grid_type::Symbol           # :cartesian, :nonuniform
-  problem_type::Symbol        # :cube, :ic_package  
-  boundary_func::Function     # 境界条件設定関数
-  solver_module::Module       # ソルバーモジュール
-  z_range_func::Function      # Z範囲設定関数
-  plot_exact_func::Union{Function, Nothing}  # 厳密解プロット関数
-  plot_result_func::Function  # 結果プロット関数
-end
-
-# Z範囲設定関数群
-function get_z_range_cartesian_cube(SZ)
-  return (2, SZ[3]-1)
-end
-
-function get_z_range_nonuniform_cube(SZ)
-  return (3, SZ[3]-2)
-end
-
-function get_z_range_nonuniform_ic(SZ)
-  return (3, SZ[3]-1)
-end
-
-# プロット関数群（統一化のためのラッパー）
-function plot_exact_cartesian(exact, Z, ox, Δh)
-  SZ = size(exact)
-  plot_slice_xz(1, mode, exact, Z, 0.5, ox, Δh, "exact.png", "Exact")
-end
-
-function plot_exact_nonuniform(exact, ox, Δh, Z)
-  SZ = size(exact)
-  plot_slice_xz_nu(1, exact, 0.5, ox, Δh, Z, "exact_nu.png", "Exact")
-end
-
-function plot_results_mode1(θ, exact, Z, ox, Δh)
-  SZ = size(θ)
-  plot_slice_xz(2, mode, θ, Z, 0.5, ox, Δh, "p.png", "solution")
-  plot_slice_xz(2, mode, abs.(θ-exact), Z, 0.5, ox, Δh, "diff.png", "diff")
-end
-
-function plot_results_mode2(θ, exact, ox, Δh, Z)
-  SZ = size(θ)
-  plot_slice_xz_nu(2, θ, 0.5, ox, Δh, Z, "p_nu.png", "solution")
-  plot_slice_xz_nu(2, abs.(θ-exact), 0.5, ox, Δh, Z, "diff_nu.png", "diff")
-end
-
-function plot_results_mode3(θ, exact, Z, ox, Δh)
-  SZ = size(θ)
-  plot_slice_xz_nu(2, θ, 0.3e-3, ox, Δh, Z, "temp3_xz_nu_y=0.3.png")
-  plot_slice_xz_nu(2, θ, 0.4e-3, ox, Δh, Z, "temp3_xz_nu_y=0.4.png")
-  plot_slice_xz_nu(2, θ, 0.5e-3, ox, Δh, Z, "temp3_xz_nu_y=0.5.png")
-  plot_slice_xy_nu(2, θ, 0.18e-3, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
-  plot_slice_xy_nu(2, θ, 0.33e-3, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
-  plot_slice_xy_nu(2, θ, 0.48e-3, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
-  plot_line_z_nu(θ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr", "Center")
-  plot_line_z_nu(θ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv", "TSV")
-end
-
-function plot_results_mode4(θ, exact, Z, ox, Δh)
-  SZ = size(θ)
-  plot_slice_xz(2, mode, θ, Z, 0.3e-3, ox, Δh, "temp4_xz_y=0.3.png")
-  plot_slice_xz(2, mode, θ, Z, 0.4e-3, ox, Δh, "temp4_xz_y=0.4.png")
-  plot_slice_xz(2, mode, θ, Z, 0.5e-3, ox, Δh, "temp4_xz_y=0.5.png")
-  plot_slice_xy(2, mode, θ, 0.18e-3, ox, Δh, Z, "temp4_xy_z=0.18.png")
-  plot_slice_xy(2, mode, θ, 0.33e-3, ox, Δh, Z, "temp4_xy_z=0.33.png")
-  plot_slice_xy(2, mode, θ, 0.48e-3, ox, Δh, Z, "temp4_xy_z=0.48.png")
-  plot_line_z(θ, ox, Δh, 0.6e-3, 0.6e-3, "temp4Z_ctr", "Center")
-  plot_line_z(θ, ox, Δh, 0.4e-3, 0.4e-3, "temp4Z_tsv", "TSV")
-end
-
-# モード設定マップ
-const MODE_CONFIGS = Dict(
-  1 => ModeConfig(
-    :cartesian, :cube,
-    Cartesian.boundary_condition!,
-    Cartesian,
-    get_z_range_cartesian_cube,
-    plot_exact_cartesian,
-    plot_results_mode1
-  ),
-  2 => ModeConfig(
-    :nonuniform, :cube,
-    NonUniform.boundary_condition!,
-    NonUniform,
-    get_z_range_nonuniform_cube,
-    plot_exact_nonuniform,
-    plot_results_mode2
-  ),
-  3 => ModeConfig(
-    :nonuniform, :ic_package,
-    NonUniformII.boundary_condition3!,
-    NonUniformII,
-    get_z_range_nonuniform_ic,
-    nothing,
-    plot_results_mode3
-  ),
-  4 => ModeConfig(
-    :cartesian, :ic_package,
-    CartesianII.boundary_condition4!,
-    CartesianII,
-    get_z_range_cartesian_cube,
-    nothing,
-    plot_results_mode4
-  )
-)
-
-# 統一ソルバー呼び出し関数
-function call_solver_unified(solver, mode, config, θ, b, λ, mask, wk, ox, Δh, Z, ΔZ, z_st, z_ed, F, itr_tol, smoother, pcg_vars...)
-    SZ = size(θ)
-    if solver == "sor"
-        if mode == 1
-            config.solver_module.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
-        elseif mode == 2
-            config.solver_module.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
-        elseif mode == 3
-            config.solver_module.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
-        elseif mode == 4
-            config.solver_module.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
-        end
-    elseif solver == "jacobi"
-        if mode == 1
-            config.solver_module.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
-        elseif mode == 2
-            config.solver_module.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
-        elseif mode == 3
-            config.solver_module.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
-        elseif mode == 4
-            config.solver_module.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
-        end
-    elseif solver == "pbicgstab"
-        pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, pcg_s_, pcg_t_ = pcg_vars
-        if mode == 1
-            config.solver_module.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
-        elseif mode == 2
-            config.solver_module.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
-        elseif mode == 3
-            config.solver_module.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
-        elseif mode == 4
-            config.solver_module.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
-        end
-    elseif solver == "cg"
-        if length(pcg_vars) >= 4
-            cg_p, cg_r, cg_ax, cg_ap = pcg_vars[1:4]
-            if mode == 1
-                config.solver_module.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, λ, mask, Δh, F, mode, itr_tol)
-            elseif mode == 4
-                config.solver_module.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, λ, mask, Δh, F, mode, itr_tol)
-            else
-                pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, pcg_s_, pcg_t_ = pcg_vars
-                config.solver_module.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                    pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
-            end
-        end
-    else
-        println("solver error")
-    end
-end
 
 #=
 @brief 境界条件 熱源項の設定
@@ -271,8 +109,8 @@ function preprocess!(λ, Z, ΔZ, ox, Δh, ID)
     genZ!(Z, ΔZ, SZ, ox, Δh[3])
 
     if mode==3 || mode==4
-        modelA.fillID!(mode, ID, ox, Δh, Z)
-        modelA.setLambda!(λ, ID)
+        modelA.fillID!(mode, ID, ox, Δh, SZ, Z)
+        modelA.setLambda!(λ, SZ, ID)
         setMatOuter!(λ)
     end
 end
@@ -287,22 +125,30 @@ function main(ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
     # 収束履歴の初期化
     conv_data = ConvergenceData(solver, smoother)
 
-    # モード設定を取得
-    config = MODE_CONFIGS[mode]
+    z_st::Int64=0
+    z_ed::Int64=0
     SZ = size(θ)
-    
-    # Z範囲の設定
-    z_st, z_ed = config.z_range_func(SZ)
 
-    # 境界条件の設定（統一的な呼び出し）
-    if mode == 1
-        config.boundary_func(θ, ox, Δh)
-    elseif mode == 2
-        config.boundary_func(θ, SZ, ox, Δh)
-    elseif mode == 3
-        config.boundary_func(θ, SZ)
-    elseif mode == 4
-        config.boundary_func(θ)
+    if mode==1 || mode==4
+        z_st = 2
+        z_ed = SZ[3]-1
+    elseif mode==2
+        z_st = 3
+        z_ed = SZ[3]-2
+    # mode=3の設定では上面は熱伝達、下面は定温
+    elseif mode==3 
+        z_st = 3
+        z_ed = SZ[3]-1 
+    end
+
+    if mode==1
+        Cartesian.boundary_condition!(θ, ox, Δh)
+    elseif mode==2
+        NonUniform.boundary_condition!(θ, SZ, ox, Δh)
+    elseif mode==3
+        NonUniformII.boundary_condition3!(θ, SZ)
+    elseif mode==4
+        CartesianII.boundary_condition4!(θ)
     end
 
     b = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -335,17 +181,60 @@ function main(ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
     F = open("log.txt", "w")
     conditions(F, SZ, Δh, solver, smoother)
 
-    # 統一化されたソルバー呼び出し
-    if solver == "pbicgstab"
-        call_solver_unified(solver, mode, config, θ, b, λ, mask, wk, ox, Δh, Z, ΔZ, z_st, z_ed, F, itr_tol, smoother, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, pcg_s_, pcg_t_)
-    elseif solver == "cg"
-        if mode == 1 || mode == 4
-            call_solver_unified(solver, mode, config, θ, b, λ, mask, wk, ox, Δh, Z, ΔZ, z_st, z_ed, F, itr_tol, smoother, cg_p, cg_r, cg_ax, cg_ap)
-        else
-            call_solver_unified(solver, mode, config, θ, b, λ, mask, wk, ox, Δh, Z, ΔZ, z_st, z_ed, F, itr_tol, smoother, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, pcg_s_, pcg_t_)
+    if solver=="sor"
+        if mode==1
+            Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
+        elseif mode==2
+            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+        elseif mode==3
+            NonUniformII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+        elseif mode==4
+            CartesianII.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
+        end
+    elseif solver=="jacobi"
+        if mode==1
+            Cartesian.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
+        elseif mode==2
+            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+        elseif mode==3
+            NonUniformII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+        elseif mode==4
+            CartesianII.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
+        end
+    elseif solver=="pbicgstab"
+        if mode==1
+            Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
+        elseif mode==2
+            NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+        elseif mode==3
+            NonUniformII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+        elseif mode==4
+            CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
+        end
+    elseif solver=="cg"
+        if mode==1
+            Cartesian.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, 
+                λ, mask, Δh, F, mode, itr_tol)
+        elseif mode==2
+            NonUniform.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+        elseif mode==3
+            NonUniformII.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
+                pcg_s_, pcg_t_, λ, mask, wk, 
+                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+        elseif mode==4
+            CartesianII.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, 
+                λ, mask, Δh, F, mode, itr_tol)
         end
     else
-        call_solver_unified(solver, mode, config, θ, b, λ, mask, wk, ox, Δh, Z, ΔZ, z_st, z_ed, F, itr_tol, smoother)
+        println("solver error")
     end
 
     s = θ[2:SZ[1]-1, 2:SZ[2]-1, z_st:z_ed]
@@ -557,26 +446,22 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     @time preprocess!(λ, Z, ΔZ, ox, Δh, ID)
 
-    # モード設定を取得
-    config = MODE_CONFIGS[mode]
-    
-    # α値のプロット（mode 3, 4のみ）
-    if mode == 3
-        plot_slice_xz_nu(1, λ, 0.3e-3, ox, Δh, Z, "alpha3.png", "α")
-    elseif mode == 4
-        plot_slice_xz(1, mode, λ, Z, 0.3e-3, ox, Δh, "alpha4.png", "α")
+    if mode==3
+        plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
+    elseif mode==4
+        plot_slice_xz(1, mode, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
     end
 
-    # 厳密解の準備と可視化（mode 1, 2のみ）
-    if mode <= 2
+    if mode<=2
         exact = zeros(Float64, SZ[1], SZ[2], SZ[3])
-        if mode == 1
-            Cartesian.exact_solution!(exact, ox, Δh)
-            config.plot_exact_func(exact, Z, ox, Δh)
-        elseif mode == 2
-            NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
-            config.plot_exact_func(exact, ox, Δh, Z)
-        end
+    end 
+
+    if mode==1
+        Cartesian.exact_solution!(exact, ox, Δh)
+        plot_slice_xz(1, mode, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
+    elseif mode==2
+        NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
+        plot_slice_xz_nu(1, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
     θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -593,13 +478,32 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     end
     
 
-    # 統一化された結果プロット
-    if mode <= 2
-        config.plot_result_func(θ, exact, Z, ox, Δh)
-        println(" L2 norm of θ-exact=", dif(θ, exact))
+    if mode==1
+        plot_slice_xz(2, mode, θ, Z, 0.5, SZ, ox, Δh, "p.png", "solution")
+        plot_slice_xz(2, mode, abs.(θ-exact), Z, 0.5, SZ, ox, Δh, "diff.png", "diff")
+        println(" L2 norm of θ-exact=",dif(θ, exact))
+    elseif mode==2
+        plot_slice_xz_nu(2, θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
+        plot_slice_xz_nu(2, abs.(θ-exact), 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        println(" L2 norm of θ-exact=",dif(θ, exact))
+    elseif mode==3
+        plot_slice_xz_nu(2, θ, 0.3e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.3.png")
+        plot_slice_xz_nu(2, θ, 0.4e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.4.png")
+        plot_slice_xz_nu(2, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.5.png")
+        plot_slice_xy_nu(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
+        plot_slice_xy_nu(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
+        plot_slice_xy_nu(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr", "Center")
+        plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv", "TSV")
     else
-        # mode 3, 4では厳密解は存在しないのでnothingを渡す
-        config.plot_result_func(θ, nothing, Z, ox, Δh)
+        plot_slice_xz(2, mode, θ, Z, 0.3e-3, SZ, ox, Δh, "temp4_xz_y=0.3.png")
+        plot_slice_xz(2, mode, θ, Z, 0.4e-3, SZ, ox, Δh, "temp4_xz_y=0.4.png")
+        plot_slice_xz(2, mode, θ, Z, 0.5e-3, SZ, ox, Δh, "temp4_xz_y=0.5.png")
+        plot_slice_xy(2, mode, θ, 0.18e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.18.png")
+        plot_slice_xy(2, mode, θ, 0.33e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.33.png")
+        plot_slice_xy(2, mode, θ, 0.48e-3, SZ, ox, Δh, Z, "temp4_xy_z=0.48.png")
+        plot_line_z(θ, SZ, ox, Δh, 0.6e-3, 0.6e-3, "temp4Z_ctr", "Center")
+        plot_line_z(θ, SZ, ox, Δh, 0.4e-3, 0.4e-3, "temp4Z_tsv", "TSV")
     end
     
     # 収束履歴の出力（反復解法の場合のみ）
