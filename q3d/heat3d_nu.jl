@@ -142,11 +142,11 @@ function main(ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
     end
 
     if mode==1
-        Cartesian.boundary_condition!(θ, SZ, ox, Δh)
+        Cartesian.boundary_condition!(θ, ox, Δh)
     elseif mode==2
-        NonUniform.boundary_condition!(θ, SZ, ox, Δh)
+        NonUniform.boundary_condition!(θ, ox, Δh)
     elseif mode==3
-        NonUniformII.boundary_condition3!(θ, SZ)
+        NonUniformII.boundary_condition3!(θ)
     elseif mode==4
         CartesianII.boundary_condition4!(θ)
     end
@@ -183,36 +183,36 @@ function main(ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
 
     if solver=="sor"
         if mode==1
-            Cartesian.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
+            Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
         elseif mode==2
-            NonUniform.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+            NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==3
-            NonUniformII.solveSOR!(θ, SZ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+            NonUniformII.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==4
             CartesianII.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol)
         end
     elseif solver=="jacobi"
         if mode==1
-            Cartesian.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
+            Cartesian.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
         elseif mode==2
-            NonUniform.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+            NonUniform.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==3
-            NonUniformII.solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
+            NonUniformII.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_st, z_ed, F, itr_tol)
         elseif mode==4
             CartesianII.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
         end
     elseif solver=="pbicgstab"
         if mode==1
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, SZ, smoother, F, mode, itr_tol)
+                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
         elseif mode==2
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+                ox, Δh, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==3
             NonUniformII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+                ox, Δh, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==4
             CartesianII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol)
@@ -224,11 +224,11 @@ function main(ox, Δh, θ, Z, ΔZ, ID, λ, solver, smoother)
         elseif mode==2
             NonUniform.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+                ox, Δh, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==3
             NonUniformII.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, SZ, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
+                ox, Δh, Z, ΔZ, z_st, z_ed, smoother, F, mode, itr_tol)
         elseif mode==4
             CartesianII.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, 
                 λ, mask, Δh, F, mode, itr_tol)
@@ -457,10 +457,10 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     end 
 
     if mode==1
-        Cartesian.exact_solution!(exact, SZ, ox, Δh)
+        Cartesian.exact_solution!(exact, ox, Δh)
         plot_slice_xz(1, mode, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
     elseif mode==2
-        NonUniform.exact_solution!(exact, SZ, ox, Δh, Z)
+        NonUniform.exact_solution!(exact, ox, Δh, Z)
         plot_slice_xz_nu(1, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
@@ -544,10 +544,11 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-  q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
+  #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
   #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
+  q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
   #q3d(1, 25, 25, "cg", epsilon=1.0e-8)
   #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
 end
@@ -555,6 +556,6 @@ end
 #q3d(2, 25, 25, "sor")
 #q3d(3, 240, 121, "pbicgstab", "gs")
 #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4)
-q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
+#q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
 #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
 #q3d(1, 25, 25, "cg")
