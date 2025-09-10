@@ -110,21 +110,21 @@ function resSOR(p::Array{Float64,3},
         ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
         mb = 1.0-m[i  ,j  ,k-1]
-        bb = b[i,j,k]-( (me*HF[1] - mw*HF[2])*dx1
-                       +(mn*HF[3] - ms*HF[4])*dy1
-                       +(mt*HF[5] - mb*HF[6])*dz1 ) # 熱流束境界
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[1]
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[2]
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[3]
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[4]
-        at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[5]
-        ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[6]
-        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
-        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
-             + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
-             + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        bb = b[i,j,k]+( (mw*HF[1] - me*HF[2])*dx1
+                       +(ms*HF[3] - mn*HF[4])*dy1
+                       +(mb*HF[5] - mt*HF[6])*dz1 ) # 熱流束境界
+        axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+        axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+        aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+        ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+        azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+        azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+        dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+        ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+             + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+             + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
         dp = (((ss-bb)/dd - pp)) * m0
-        r = (dd + ω*(aw+as+ab))*dp / ω
+        r = (dd + ω*(axm+aym+azm))*dp / ω
         res += r*r
     end
     
@@ -174,23 +174,23 @@ function sor!(p::Array{Float64,3},
         ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
         mb = 1.0-m[i  ,j  ,k-1]
-        bb = b[i,j,k]-( (me*HF[1] - mw*HF[2])*dx1
-                       +(mn*HF[3] - ms*HF[4])*dy1
-                       +(mt*HF[5] - mb*HF[6])*dz1 ) # 熱流束境界
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[1]
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[2]
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[3]
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[4]
-        at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[5]
-        ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[6]
-        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
-        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
-        + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
-        + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        bb = b[i,j,k]+( (mw*HF[1] - me*HF[2])*dx1
+                       +(ms*HF[3] - mn*HF[4])*dy1
+                       +(mb*HF[5] - mt*HF[6])*dz1 ) # 熱流束境界
+        axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+        axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+        aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+        ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+        azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+        azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+        dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+        ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+        + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+        + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
         dp = (((ss-bb)/dd - pp)) * m0
         pn = pp + ω * dp
         p[i,j,k] = pn
-        r = (dd + ω*(aw+as+ab))*dp / ω
+        r = (dd + ω*(axm+aym+azm))*dp / ω
         res += r*r
     end
 
@@ -243,23 +243,23 @@ function rbsor_core!(p::Array{Float64,3},
             ms = 1.0-m[i  ,j-1,k  ]
             mt = 1.0-m[i  ,j  ,k+1]
             mb = 1.0-m[i  ,j  ,k-1]
-            bb = b[i,j,k]-( (me*HF[1] - mw*HF[2])*dx1
-                           +(mn*HF[3] - ms*HF[4])*dy1
-                           +(mt*HF[5] - mb*HF[6])*dz1 ) # 熱流束境界
-            ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[1]
-            aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[2]
-            an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[3]
-            as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[4]
-            at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[5]
-            ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[6]
-            dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
-            ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
-               + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
-               + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+            bb = b[i,j,k]+( (mw*HF[1] - me*HF[2])*dx1
+                       +(ms*HF[3] - mn*HF[4])*dy1
+                       +(mb*HF[5] - mt*HF[6])*dz1 ) # 熱流束境界
+            axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+            axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+            aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+            ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+            azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+            azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+            dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+            ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+               + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+               + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
             dp = (((ss-bb)/dd - pp)) * m0
             pn = pp + ω * dp
             p[i,j,k] = pn
-            r = (dd + ω*(aw+as+ab))*dp / ω
+            r = (dd + ω*(axm+aym+azm))*dp / ω
             res += r*r
         end
     end
@@ -328,7 +328,6 @@ function PBiCGSTAB!(X::Array{Float64,3},
                pcg_t_::Array{Float64,3},
                     λ::Array{Float64,3},
                  mask::Array{Float64,3},
-                   wk::Array{Float64,3},
                    ox,
                     Δh,
              smoother::String,
@@ -365,7 +364,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
         end
 
         pcg_p_ .= 0.0  #fill!(pcg_p_, 0.0)
-        Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, Δh, smoother, HF, HT)
+        Preconditioner!(pcg_p_, pcg_p, λ, mask, Δh, smoother, HF, HT)
 
         CalcAX!(pcg_q, pcg_p_, Δh, λ, mask, HF, HT)
         alpha = rho / Fdot2(pcg_q, pcg_r0)
@@ -373,7 +372,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
         Triad!(pcg_s, pcg_q, pcg_r, r_alpha)
 
         pcg_s_ .= 0.0  #fill!(pcg_s_, 0.0)
-        Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, Δh, smoother, HF, HT);
+        Preconditioner!(pcg_s_, pcg_s, λ, mask, Δh, smoother, HF, HT);
 
         CalcAX!(pcg_t_, pcg_s_, Δh, λ, mask, HF, HT)
         omega = Fdot2(pcg_t_, pcg_s) / Fdot1(pcg_t_)
@@ -449,19 +448,19 @@ function CalcRK!(
         ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
         mb = 1.0-m[i  ,j  ,k-1]
-        bb = b[i,j,k]-( (me*HF[1] - mw*HF[2])*dx1
-                       +(mn*HF[3] - ms*HF[4])*dy1
-                       +(mt*HF[5] - mb*HF[6])*dz1 ) # 熱流束境界
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[1]
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[2]
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[3]
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[4]
-        at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[5]
-        ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[6]
-        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
-        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
-             + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
-             + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        bb = b[i,j,k]+( (mw*HF[1] - me*HF[2])*dx1
+                       +(ms*HF[3] - mn*HF[4])*dy1
+                       +(mb*HF[5] - mt*HF[6])*dz1 ) # 熱流束境界
+        axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+        axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+        aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+        ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+        azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+        azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+        dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+        ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+             + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+             + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
         rs = (bb - (ss - dd * p[i,j,k]))* m0
         r[i,j,k] = rs
         res += rs*rs
@@ -527,7 +526,6 @@ end
 @param [in]     bb   RHSベクトル
 @param [in]     λ    熱伝導率
 @param [in]     mask マスク配列
-@param [in]     wk   作業ベクトル
 @param [in]     Δh   セル幅
 @param [in]     smoother  ["jacobi", "gs", ""]
 """
@@ -535,7 +533,6 @@ function Preconditioner!(xx::Array{Float64,3},
                          bb::Array{Float64,3}, 
                           λ::Array{Float64,3}, 
                        mask::Array{Float64,3}, 
-                         wk::Array{Float64,3}, 
                          Δh,
                    smoother::String,
                    HF::Vector{Float64},
@@ -543,13 +540,15 @@ function Preconditioner!(xx::Array{Float64,3},
 
     res::Float64 = 0.0
     LCmax::Int = 5
-
+    #=
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)
         for _ in 1:LCmax
             res = jacobi!(xx, λ, bb, mask, Δh, 0.8, wk)
         end
-    elseif smoother=="gs"
+    else
+    =#
+    if smoother=="gs"
         #P_SOR!(xx, bb, LCmax, SZ, λ, mask, Δh)
         for _ in 1:LCmax
             res = rbsor!(xx, λ, bb, mask, Δh, 1.0, HF, HT)
@@ -598,16 +597,16 @@ function CalcAX!(ap::Array{Float64,3},
         ms = 1.0-m[i  ,j-1,k  ]
         mt = 1.0-m[i  ,j  ,k+1]
         mb = 1.0-m[i  ,j  ,k-1]
-        ae = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[1]
-        aw = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[2]
-        an = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[3]
-        as = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[4]
-        at = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[5]
-        ab = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[6]
-        dd = (1.0-m0) + (ae + aw + an + as + at + ab)*m0
-        ss = ( ae * p[i+1,j  ,k  ] + aw * p[i-1,j  ,k  ]
-             + an * p[i  ,j+1,k  ] + as * p[i  ,j-1,k  ]
-             + at * p[i  ,j  ,k+1] + ab * p[i  ,j  ,k-1] )
+        axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+        axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+        aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+        ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+        azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+        azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+        dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+        ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+             + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+             + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
         ap[i,j,k] = (ss - dd*p[i,j,k]) * m0
     end
 end

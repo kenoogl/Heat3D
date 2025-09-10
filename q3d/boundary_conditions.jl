@@ -88,33 +88,31 @@ end
 @param θ 温度配列
 @param λ 熱伝導率配列
 @param mask マスク配列
-@param b Poisson右辺項，ガイドセル部分に境界条件定数を埋め込み
 @param bc_set 境界条件セット
 """
 function apply_boundary_conditions!(θ::Array{Float64,3}, 
                                     λ::Array{Float64,3},
                                     mask::Array{Float64,3},
-                                    b::Array{Float64,3},
                                     bc_set::BoundaryConditionSet)
     SZ = size(θ)
     
     # X軸負方向面 (i=1)
-    apply_face_boundary!(θ, λ, mask, b, bc_set.x_minus, :x_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.x_minus, :x_minus)
     
     # X軸正方向面 (i=SZ[1])
-    apply_face_boundary!(θ, λ, mask, b, bc_set.x_plus, :x_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.x_plus, :x_plus)
     
     # Y軸負方向面 (j=1)
-    apply_face_boundary!(θ, λ, mask, b, bc_set.y_minus, :y_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.y_minus, :y_minus)
     
     # Y軸正方向面 (j=SZ[2])
-    apply_face_boundary!(θ, λ, mask, b, bc_set.y_plus, :y_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.y_plus, :y_plus)
     
     # Z軸負方向面 (k=1)
-    apply_face_boundary!(θ, λ, mask, b, bc_set.z_minus, :z_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.z_minus, :z_minus)
     
     # Z軸正方向面 (k=SZ[3])
-    apply_face_boundary!(θ, λ, mask, b, bc_set.z_plus, :z_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.z_plus, :z_plus)
 end
 
 """
@@ -122,14 +120,12 @@ end
 @param θ 温度配列
 @param λ 熱伝導率配列
 @param mask マスク配列
-@param b Poisson右辺項，ガイドセル部分に境界条件定数を埋め込み
 @param bc 境界条件
 @param face_type 面のタイプ (:x_minus, :x_plus, :y_minus, :y_plus, :z_minus, :z_plus)
 """
 function apply_face_boundary!(θ::Array{Float64,3}, 
                             λ::Array{Float64,3}, 
                             mask::Array{Float64,3}, 
-                            b::Array{Float64,3}, 
                             bc::BoundaryCondition, 
                             face_type::Symbol)
     
@@ -139,7 +135,7 @@ function apply_face_boundary!(θ::Array{Float64,3},
         
     elseif bc.type == HEAT_FLUX
         # 熱流束条件: λを調整 (断熱条件の場合は λ=0)
-        apply_heat_flux!(λ, mask, b, bc, face_type)
+        apply_heat_flux!(λ, mask, bc, face_type)
         
     elseif bc.type == CONVECTION
         # 熱伝達条件: λとmaskを調整
@@ -157,6 +153,7 @@ function apply_isothermal!(θ::Array{Float64,3},
                         face_type::Symbol)
     SZ = size(mask)
     temp = bc.temperature
+
     if face_type == :x_minus
         for k in 1:SZ[3], j in 1:SZ[2]
             mask[1, j, k] = 0.0      # マスク値を0に設定
@@ -202,7 +199,6 @@ end
 """
 function apply_heat_flux!(λ::Array{Float64,3}, 
                         mask::Array{Float64,3}, 
-                        b::Array{Float64,3}, 
                         bc::BoundaryCondition, 
                         face_type::Symbol)
     SZ = size(mask)

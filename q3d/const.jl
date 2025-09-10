@@ -7,11 +7,6 @@ const FloatMin = 1.0e-37
 const ω      = 1.0
 
 # 境界条件
-const θ_init = 300.0 # 初期温度
-const θ_amb = 300.0
-const θ_pcb = 300.0
-const HT_top = 2.98e-4 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
-const HT_side = 2.98e-6 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
 const Q_src = 9.5374e4# 1.6x10^11 [W/m^3] / (\rho C)_silicon > [K/s]
 
 end # end of module Constant

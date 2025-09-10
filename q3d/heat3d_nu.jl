@@ -87,7 +87,7 @@ end
 @param [in,out] b    右辺項
 @param [in]     ID   識別子配列
 =#
-function calRHS!(b::Array{Float64,3}, ID::Array{UInt8,3})
+function HeatSrc!(b::Array{Float64,3}, ID::Array{UInt8,3})
     SZ = size(b)
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         if ID[i,j,k] == modelA.pwrsrc["id"]
@@ -204,10 +204,8 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     println(HT)
 
     if mode==3 || mode==4
-        calRHS!(b, ID)
+        HeatSrc!(b, ID)
     end
-
-    wk = zeros(Float64, SZ[1], SZ[2], SZ[3])
 
     if solver=="pbicgstab"
         pcg_p  = zeros(Float64, SZ[1], SZ[2], SZ[3])
@@ -251,7 +249,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     elseif solver=="pbicgstab"
         if mode==1 || mode==4
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, ox, Δh, smoother, F, mode, itr_tol, HF, HT)
+                pcg_s_, pcg_t_, λ, mask, ox, Δh, smoother, F, mode, itr_tol, HF, HT)
         elseif mode==2
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, wk, 
@@ -404,7 +402,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     θ .= θ_init # 初期温度設定
 
     print_boundary_conditions(bc_set)
-    apply_boundary_conditions!(θ, λ, mask, b, bc_set)
+    apply_boundary_conditions!(θ, λ, mask, bc_set)
     if mode==1 || mode==2
         bc_cube!(θ, ox, Δh) # Z方向の上下面の分布を上書き
     end
@@ -489,13 +487,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
   #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
-  q3d(1, 25, 25, "sor", epsilon=1.0e-4)
+  #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
   #q3d(1, 25, 25, "cg", epsilon=1.0e-8)
   #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
   #q3d(4, 240, 120, "sor", epsilon=1.0e-4)
   #q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
-  #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
+  q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
 end
 #q3d(1, 25, 25, "pbicgstab")
 #q3d(2, 25, 25, "sor")
