@@ -1,5 +1,5 @@
 module Cartesian
-export exact_solution!, solveSOR!, PBiCGSTAB!
+export exact_solution!, solveSOR!, PBiCGSTAB!, CG!
 
 using Printf
 

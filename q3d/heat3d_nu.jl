@@ -40,14 +40,17 @@ Mode3用の境界条件（NonUniform格子のIC問題）
 Z下面: PCB温度、Z上面: 熱伝達、側面: 断熱
 """
 function set_mode3_bc_parameters()
+    θ_amb = 300.0 # [K]
+    θ_pcb = 300.0 # [K]
+    HT_top = 2.98e-4 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     
     # 各面の境界条件を定義
     x_minus_bc = adiabatic_bc()                        # X軸負方向面: 断熱
     x_plus_bc  = adiabatic_bc()                        # X軸正方向面: 断熱
     y_minus_bc = adiabatic_bc()                        # Y軸負方向面: 断熱
     y_plus_bc  = adiabatic_bc()                        # Y軸正方向面: 断熱
-    z_minus_bc = isothermal_bc(Constant.θ_pcb)                  # Z軸負方向面: PCB温度
-    z_plus_bc  = convection_bc(Constant.HT_top, Constant.θ_amb)          # Z軸正方向面: 熱伝達
+    z_minus_bc = isothermal_bc(θ_pcb)                  # Z軸負方向面: PCB温度
+    z_plus_bc  = convection_bc(HT_top, θ_amb)          # Z軸正方向面: 熱伝達
     
     # 境界条件セットを作成
     return create_boundary_conditions(x_minus_bc, x_plus_bc,
@@ -60,13 +63,17 @@ Mode4用の境界条件（IC package問題）
 Z下面: PCB温度、Z上面: 周囲温度、側面: 周囲温度
 """
 function set_mode4_bc_parameters()
+    θ_amb = 300.0 # [K]
+    θ_pcb = 300.0 # [K]
+    HT_top = 2.98e-4 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
+    HT_side = 2.98e-6 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     # 各面の境界条件を定義
-    x_minus_bc = convection_bc(Constant.HT_side, Constant.θ_amb)
-    x_plus_bc  = convection_bc(Constant.HT_side, Constant.θ_amb)
-    y_minus_bc = convection_bc(Constant.HT_side, Constant.θ_amb)  
-    y_plus_bc  = convection_bc(Constant.HT_side, Constant.θ_amb)
-    z_minus_bc = isothermal_bc(Constant.θ_pcb)         # Z軸負方向面: PCB温度
-    z_plus_bc  = convection_bc(Constant.HT_top, Constant.θ_amb)
+    x_minus_bc = convection_bc(HT_side, θ_amb)
+    x_plus_bc  = convection_bc(HT_side, θ_amb)
+    y_minus_bc = convection_bc(HT_side, θ_amb)  
+    y_plus_bc  = convection_bc(HT_side, θ_amb)
+    z_minus_bc = isothermal_bc(θ_pcb)         # Z軸負方向面: PCB温度
+    z_plus_bc  = convection_bc(HT_top, θ_amb)
     
     # 境界条件セットを作成
     return create_boundary_conditions(x_minus_bc, x_plus_bc,
@@ -127,18 +134,12 @@ function conditions(F, SZ, Δh, solver, smoother)
     end
     @printf(F, "ItrMax : %e\n", Constant.ItrMax)
     @printf(F, "ε      : %e\n", itr_tol)
-    @printf(F, "θ_init : %e\n", Constant.θ_init)
-    @printf(F, "θ_amb  : %e\n", Constant.θ_amb)
-    @printf(F, "θ_pcb  : %e\n", Constant.θ_pcb)
-    @printf(F, "HT_top : %e\n", Constant.HT_top)
-    @printf(F, "HT_side: %e\n", Constant.HT_side)
-    @printf(F, "Q_src  : %e\n", Constant.Q_src)
 end
 
 """
 @param z_range Z方向の計算内部領域インデクス
 """
-function preprocess!(θ, λ, mask, b, Z, ΔZ, ox, Δh, ID)
+function preprocess!(λ, Z, ΔZ, ox, Δh, ID)
     SZ = size(λ)
     genZ!(Z, ΔZ, SZ, ox, Δh[3], mode)
 
@@ -351,16 +352,12 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     λ = Array{Float64}(undef, SZ[1], SZ[2], SZ[3])
     λ .= 1.0 # default
 
-    ID = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
-
-    θ = zeros(Float64, SZ[1], SZ[2], SZ[3])
-    θ .= Constant.θ_init # 初期温度設定
-
-    b = zeros(Float64, SZ[1], SZ[2], SZ[3])
-
+    ID   = zeros(UInt8, SZ[1], SZ[2], SZ[3]) # mode=3のときのみ有効
+    θ    = zeros(Float64, SZ[1], SZ[2], SZ[3])
+    b    = zeros(Float64, SZ[1], SZ[2], SZ[3])
     mask = ones(Float64, SZ[1], SZ[2], SZ[3])
     
-    @time preprocess!(θ, λ, mask, b, Z, ΔZ, ox, Δh, ID)
+    @time preprocess!(λ, Z, ΔZ, ox, Δh, ID)
     #plot_slice2(mask, SZ, "mask.png")
 
     if mode==3
@@ -382,27 +379,33 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     end
     
     # Boundary condition
-    if mode==1 
+    if mode==1 # Cartesian, CUBE
         bc_set = set_mode1_bc_parameters()
         z_range[1] = 2
         z_range[2] = SZ[3]-1
-    elseif mode==2
+        θ_init = 0.0
+    elseif mode==2 # Non-uniform, CUBE
         bc_set = set_mode2_bc_parameters()
         z_range[1] = 3
         z_range[2] = SZ[3]-2
-    elseif mode==3
+        θ_init = 0.0
+    elseif mode==3 # Non-uniform, 3D-IC
         bc_set = set_mode3_bc_parameters()
         z_range[1] = 3
         z_range[2] = SZ[3]-1
-    elseif mode==4
+        θ_init = 300.0
+    elseif mode==4 # Cartesian, 3D-IC
         bc_set = set_mode4_bc_parameters()
         z_range[1] = 2
         z_range[2] = SZ[3]-1
+        θ_init = 300.0
     end
+
+    θ .= θ_init # 初期温度設定
 
     print_boundary_conditions(bc_set)
     apply_boundary_conditions!(θ, λ, mask, b, bc_set)
-    if mode==1
+    if mode==1 || mode==2
         bc_cube!(θ, ox, Δh) # Z方向の上下面の分布を上書き
     end
 
@@ -486,13 +489,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
   #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
-  #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
+  q3d(1, 25, 25, "sor", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
   #q3d(1, 25, 25, "cg", epsilon=1.0e-8)
   #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
   #q3d(4, 240, 120, "sor", epsilon=1.0e-4)
   #q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
-  q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
+  #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
 end
 #q3d(1, 25, 25, "pbicgstab")
 #q3d(2, 25, 25, "sor")
