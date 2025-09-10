@@ -73,7 +73,6 @@ end
 #=
 @brief 厳密解
 @param [out]    e      解ベクトル
-@param [in]     SZ     配列長
 @param [in]     Δh     セル幅
 @param [in]     Z      
 =#
@@ -93,7 +92,6 @@ end
 #=
 @brief 境界条件
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 =#
 function boundary_condition!(p::Array{Float64,3}, ox, Δh)
@@ -122,7 +120,6 @@ end
 #=
 @brief SOR法による求解
 @param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    RHSベクトル
 @param [in]     mask マスク配列
@@ -130,13 +127,12 @@ end
 @param [in]     ω    加速係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+function solveSOR!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range::Array{Int64,2}, F, tol)
 
-    res0 = resSOR(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
+    res0 = resSOR(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range)
     if res0==0.0
         res0 = 1.0
     end
@@ -144,7 +140,7 @@ function solveSOR!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
 
     n = 0
     for n in 1:Constant.ItrMax
-        res = sor!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed) / res0
+        res = sor!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         #println(n, " ", res)
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
@@ -158,7 +154,6 @@ end
 #=
 @brief SOR法の残差
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -166,12 +161,10 @@ end
 @param [in] 　　　　　　　　ω    加速係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret                 1セルあたりの残差RMS
 =#
 function resSOR(p::Array{Float64,3}, 
-                SZ, 
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
                 m::Array{Float64,3}, 
@@ -179,15 +172,16 @@ function resSOR(p::Array{Float64,3},
                 ω::Float64,
                 Z::Vector{Float64},
                 ΔZ::Vector{Float64},
-                z_st::Int, 
-                z_ed::Int
+                z_range::Array{Int64,2}
                 )
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
@@ -218,7 +212,6 @@ end
 #=
 @brief SOR法
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -226,12 +219,10 @@ end
 @param [in] 　　　　　　　　ω    加速係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret                 1セルあたりの残差RMS
 =#
 function sor!(p::Array{Float64,3}, 
-              SZ, 
               λ::Array{Float64,3}, 
               b::Array{Float64,3},
               m::Array{Float64,3}, 
@@ -239,14 +230,15 @@ function sor!(p::Array{Float64,3},
               ω::Float64,
               Z::Vector{Float64},
              ΔZ::Vector{Float64},
-             z_st::Int, 
-             z_ed::Int)
-
+             z_range::Array{Int64,2})
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
@@ -277,14 +269,9 @@ function sor!(p::Array{Float64,3},
 end
 
 
-
-
-
-
 #=
 @brief 緩和ヤコビ法による求解
 @param [in/out] θ    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    RHSベクトル
 @param [in]     mask マスク配列
@@ -293,13 +280,12 @@ end
 @param [in]     ω    緩和係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @param [in]     F    ファイルディスクリプタ
 =#
-function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F, tol)
+function solveJACOBI!(θ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_range::Array{Int64,2}, F, tol)
 
-    res0 = resJCB(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed)
+    res0 = resJCB(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range)
     if res0==0.0
         res0 = 1.0
     end
@@ -307,7 +293,7 @@ function solveJACOBI!(θ, SZ, λ, b, mask, wk, Δh, ω, Z, ΔZ, z_st, z_ed, F, t
 
     n = 0
     for n in 1:Constant.ItrMax
-        res = jacobi!(θ, SZ, λ, b, mask, Δh, ω, Z, ΔZ, z_st, z_ed, wk) / res0
+        res = jacobi!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, wk) / res0
         #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω) / res0
         
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
@@ -322,7 +308,6 @@ end
 #=
 @brief 緩和Jacobi法の残差
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -330,12 +315,10 @@ end
 @param [in] 　　　　　　　　ω    緩和係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret                 1セルあたりの残差RMS
 =#
 function resJCB(p::Array{Float64,3},
-                SZ,
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
                 m::Array{Float64,3}, 
@@ -343,14 +326,15 @@ function resJCB(p::Array{Float64,3},
                 ω::Float64, 
                 Z::Vector{Float64}, 
                 ΔZ::Vector{Float64}, 
-                z_st::Int, 
-                z_ed::Int)
-
+                z_range::Array{Int64,2})
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
@@ -382,7 +366,6 @@ end
 #=
 @brief 緩和Jacobi法
 @param [in,out] p    解ベクトル
-@param [in]     SZ   配列長
 @param [in]     λ    熱伝導率
 @param [in]     b    右辺ベクトル
 @param [in]     m    マスク配列
@@ -390,13 +373,11 @@ end
 @param [in] 　　　　　　　　ω    緩和係数
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @param [out]    wk   ワーク用配列
 @ret                 1セルあたりの残差RMS
 =#
 function jacobi!(p::Array{Float64,3},
-                 SZ,
                  λ::Array{Float64,3}, 
                  b::Array{Float64,3},
                  m::Array{Float64,3}, 
@@ -404,15 +385,16 @@ function jacobi!(p::Array{Float64,3},
                  ω::Float64,
                  Z::Vector{Float64}, 
                 ΔZ::Vector{Float64}, 
-              z_st::Int, 
-              z_ed::Int,
+              z_range::Array{Int64,2},
                 wk::Array{Float64,3})
-
+    SZ = size(p)
     res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
@@ -454,11 +436,9 @@ end
 @param [in]     λ      熱伝導率
 @param [in]     mask   マスク配列
 @param [in]     Δh     セル幅
-@param [in]     SZ     配列長
 @param [in]     Z    Z座標
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @param [in] 　　　　　　　　ItrMax 前処理反復数
 @param [in] 　　　　　　　　smoother ["gs", "jacobi", ""]
 @param [in]     F      ファイルディスクリプタ
@@ -479,20 +459,18 @@ function PBiCGSTAB!(X::Array{Float64,3},
                    wk::Array{Float64,3},
                     ox,
                     Δh,
-                    SZ,
                     Z::Vector{Float64}, 
                    ΔZ::Vector{Float64}, 
-                 z_st::Int, 
-                 z_ed::Int,
+                 z_range::Array{Int64,2},
              smoother::String,
                     F,
                     mode,
                     tol)
    
-    fill!(pcg_q, 0.0)
-    res0 = CalcRK!(SZ, pcg_r, X, B, λ, mask, Δh, Z, ΔZ, z_st, z_ed)
+    pcg_q .= 0.0  #fill!(pcg_q, 0.0)
+    res0 = CalcRK!(pcg_r, X, B, λ, mask, Δh, Z, ΔZ, z_range)
     println("Inital residual = ", res0)
-    copy!(pcg_r0, pcg_r)
+    pcg_r0 .= pcg_r  #copy!(pcg_r0, pcg_r)
 
     rho_old::Float64 = 1.0
     alpha::Float64 = 0.0
@@ -501,7 +479,7 @@ function PBiCGSTAB!(X::Array{Float64,3},
     beta::Float64 = 0.0
 
     for itr in 1:Constant.ItrMax
-        rho = Fdot2(pcg_r, pcg_r0, SZ, z_st, z_ed) # 非計算部分はゼロのこと
+        rho = Fdot2(pcg_r, pcg_r0, z_range) # 非計算部分はゼロのこと
 
         if abs(rho) < Constant.FloatMin
             itr = 0
@@ -509,36 +487,31 @@ function PBiCGSTAB!(X::Array{Float64,3},
         end
 
         if itr == 1
-            copy!(pcg_p, pcg_r)
+            pcg_p .= pcg_r  #copy!(pcg_p, pcg_r)
         else
             beta = rho / rho_old * alpha / omega
-            BiCG1!(pcg_p, pcg_r, pcg_q, beta, omega, SZ, z_st, z_ed)
+            BiCG1!(pcg_p, pcg_r, pcg_q, beta, omega, z_range)
         end
 
-        fill!(pcg_p_, 0.0)
-        Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, SZ, Δh, smoother, Z, ΔZ, z_st, z_ed)
+        pcg_p_ .= 0.0  #fill!(pcg_p_, 0.0)
+        Preconditioner!(pcg_p_, pcg_p, λ, mask, wk, Δh, smoother, Z, ΔZ, z_range)
 
-        CalcAX!(pcg_q, pcg_p_, SZ, Δh, λ, mask, Z, ΔZ, z_st, z_ed)
-        alpha = rho / Fdot2(pcg_q, pcg_r0, SZ, z_st, z_ed)
+        CalcAX!(pcg_q, pcg_p_, Δh, λ, mask, Z, ΔZ, z_range)
+        alpha = rho / Fdot2(pcg_q, pcg_r0, z_range)
         r_alpha = -alpha
-        Triad!(pcg_s, pcg_q, pcg_r, r_alpha, SZ, z_st, z_ed)
+        Triad!(pcg_s, pcg_q, pcg_r, r_alpha, z_range)
 
-        fill!(pcg_s_, 0.0)
-        Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, SZ, Δh, smoother, Z, ΔZ, z_st, z_ed);
+        pcg_s_ .= 0.0  #fill!(pcg_s_, 0.0)
+        Preconditioner!(pcg_s_, pcg_s, λ, mask, wk, Δh, smoother, Z, ΔZ, z_range);
 
-        CalcAX!(pcg_t_, pcg_s_, SZ, Δh, λ, mask, Z, ΔZ, z_st, z_ed)
-        omega = Fdot2(pcg_t_, pcg_s, SZ, z_st, z_ed) / Fdot1(pcg_t_, SZ, z_st, z_ed)
+        CalcAX!(pcg_t_, pcg_s_, Δh, λ, mask, Z, ΔZ, z_range)
+        omega = Fdot2(pcg_t_, pcg_s, z_range) / Fdot1(pcg_t_, z_range)
         r_omega = -omega
 
-        BICG2!(X, pcg_p_, pcg_s_, alpha , omega, SZ, z_st, z_ed)
-        if mode==3
-            boundary_condition3!(X, SZ)
-        else
-            boundary_condition!(X, SZ, ox, Δh)
-        end
+        BICG2!(X, pcg_p_, pcg_s_, alpha , omega, z_range)
 
-        Triad!(pcg_r, pcg_t_, pcg_s, r_omega, SZ, z_st, z_ed)
-        res = sqrt(Fdot1(pcg_r, SZ, z_st, z_ed))/((SZ[1]-2)*(SZ[2]-2)*(z_ed-z_st+1))
+        Triad!(pcg_r, pcg_t_, pcg_s, r_omega, z_range)
+        res = sqrt(Fdot1(pcg_r, z_range))/((SZ[1]-2)*(SZ[2]-2)*(z_range[2]-z_range[1]+1))
         res /= res0
         #println(itr, " ", res)
         @printf(F, "%10d %24.14E\n", itr, res) # 時間計測の場合にはコメントアウト
@@ -557,7 +530,6 @@ end
 
 #=
 @brief 残差ベクトルの計算
-@param [in]     SZ   配列寸法
 @param [out]    r    残差ベクトル
 @param [in]     p    解ベクトル
 @param [in]     b    右辺ベクトル
@@ -565,11 +537,10 @@ end
 @param [in]     m    マスク配列
 @param [in]     Δh   セル幅
 @param [in]     ΔZ   格子幅
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret                 セルあたりの残差RMS
 =#
-function CalcRK!(SZ, 
+function CalcRK!(
                 r::Array{Float64,3}, 
                 p::Array{Float64,3}, 
                 b::Array{Float64,3},
@@ -578,14 +549,15 @@ function CalcRK!(SZ,
                 Δh,
                 Z::Vector{Float64}, 
                ΔZ::Vector{Float64}, 
-             z_st::Int, 
-             z_ed::Int)
-
+             z_range::Array{Int64,2})
+    SZ = size(p)
     res::Float64 = 0.0
     dx0::Float64 = Δh[1]
     dy0::Float64 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
@@ -614,13 +586,13 @@ end
 #=
 @brief ベクトルの内積
 @param [in]     x    ベクトル
-@param [in]     SZ   配列長
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret            　    内積
 =#
-function Fdot1(x::Array{Float64,3}, SZ, z_st::Int, z_ed::Int)
-
+function Fdot1(x::Array{Float64,3}, z_range::Array{Int64,2})
+    SZ = size(x)
+    z_st = z_range[1]
+    z_ed = z_range[2]
     y::Float64 = 0.0
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         y += x[i,j,k] * x[i,j,k]
@@ -634,13 +606,13 @@ end
 @brief 2ベクトルの内積
 @param [in]     x    ベクトル
 @param [in]     y    ベクトル
-@param [in]     SZ   配列長
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 @ret            　　   内積
 =#
-function Fdot2(x::Array{Float64,3}, y::Array{Float64,3}, SZ, z_st::Int, z_ed::Int)
-
+function Fdot2(x::Array{Float64,3}, y::Array{Float64,3}, z_range)
+    SZ = size(x)
+    z_st = z_range[1]
+    z_ed = z_range[2]
     xy::Float64 = 0.0
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         xy += x[i,j,k] * y[i,j,k]
@@ -657,19 +629,17 @@ end
 @param [in]     q    ベクトル
 @param [in]     beta 係数
 @param [in]     omg  係数
-@param [in]     SZ   配列長
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 =#
 function BiCG1!(p::Array{Float64,3}, 
                 r::Array{Float64,3}, 
                 q::Array{Float64,3}, 
              beta::Float64, 
               omg::Float64, 
-                SZ, 
-             z_st::Int, 
-             z_ed::Int)
-
+             z_range::Array{Int64,2})
+    SZ = size(p)
+    z_st = z_range[1]
+    z_ed = z_range[2]
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         p[i,j,k] = r[i,j,k] + beta * (p[i,j,k] - omg * q[i,j,k])
     end
@@ -683,19 +653,19 @@ end
 @param [in]     λ    熱伝導率
 @param [in]     mask マスク配列
 @param [in]     wk   作業ベクトル
-@param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 @param [in]     smoother  ["jacobi", "dor", ""]
+@param [in]     z_range Zループ開始/終了インデクス
 =#
 function Preconditioner!(xx::Array{Float64,3},
                          bb::Array{Float64,3}, 
                           λ::Array{Float64,3}, 
                        mask::Array{Float64,3}, 
                          wk::Array{Float64,3}, 
-                         SZ,
                          Δh,
                    smoother::String,
-                   Z, ΔZ, z_st, z_ed)
+                   Z, ΔZ, 
+                   z_range::Array{Int64,2})
 
     res::Float64 = 0.0
     LCmax::Int = 5
@@ -703,15 +673,15 @@ function Preconditioner!(xx::Array{Float64,3},
     if smoother=="jacobi"
         #P_Jacobi!(xx, bb, LCmax, SZ, λ, mask, Δh, wk)
         for _ in 1:LCmax
-            res = jacobi!(xx, SZ, λ, bb, mask, Δh, 0.8, wk, Z, ΔZ, z_st, z_ed)
+            res = jacobi!(xx, λ, bb, mask, Δh, 0.8, wk, Z, ΔZ, z_range)
         end
     elseif smoother=="gs"
         #P_SOR!(xx, bb, LCmax, SZ, λ, mask, Δh)
         for _ in 1:LCmax
-            res = sor!(xx, SZ, λ, bb, mask, Δh, 1.0, Z, ΔZ, z_st, z_ed)
+            res = sor!(xx, λ, bb, mask, Δh, 1.0, Z, ΔZ, z_range)
         end
     else
-        copy!(xx, bb)
+        xx .= bb  #copy!(xx, bb)
     end
 end
 
@@ -721,26 +691,26 @@ end
 @brief AXの計算
 @param [out] ap   AX
 @param [in]  p    解ベクトル
-@param [in]  SZ   配列長
 @param [in]  Δh   セル幅
 @param [in]  λ    熱伝導率
 @param [in]  mask マスク配列
+@param [in]     z_range Zループ開始/終了インデクス
 =#
 function CalcAX!(ap::Array{Float64,3}, 
                   p::Array{Float64,3}, 
-                  SZ,
                   Δh,
                   λ::Array{Float64,3}, 
                   m::Array{Float64,3},
                   Z::Vector{Float64}, 
                  ΔZ::Vector{Float64}, 
-               z_st::Int, 
-               z_ed::Int)
-
+               z_range::Array{Int64,2})
+    SZ = size(p)
     dx0 = Δh[1]
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
+    z_st = z_range[1]
+    z_ed = z_range[2]
 
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         λ0 = λ[i,j,k]
@@ -769,18 +739,16 @@ end
 @param [in]     y    ベクトル
 @param [in]     x    ベクトル
 @param [in]     a    係数
-@param [in]     SZ   配列長
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 =#
 function Triad!(z::Array{Float64,3}, 
                 x::Array{Float64,3}, 
                 y::Array{Float64,3}, 
                 a::Float64, 
-                SZ,
-             z_st::Int, 
-             z_ed::Int)
-
+             z_range::Array{Int64,2})
+    SZ = size(z)
+    z_st = z_range[1]
+    z_ed = z_range[2]
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         z[i,j,k] = a * x[i,j,k] + y[i,j,k]
     end
@@ -794,19 +762,17 @@ end
 @param [in]     x    ベクトル
 @param [in]     a    係数
 @param [in]     b    係数
-@param [in]     SZ   配列長
-@param [in]     z_st Zループ開始インデクス
-@param [in]     z_ed Zループ終了インデクス
+@param [in]     z_range Zループ開始/終了インデクス
 =#
 function BICG2!(z::Array{Float64,3}, 
                 x::Array{Float64,3}, 
                 y::Array{Float64,3}, 
                 a::Float64, 
                 b::Float64, 
-                SZ,
-             z_st::Int, 
-             z_ed::Int)
-
+             z_range::Array{Int64,2})
+    SZ = size(z)
+    z_st = z_range[1]
+    z_ed = z_range[2]
     for k in z_st:z_ed, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         z[i,j,k] += a * x[i,j,k] + b * y[i,j,k]
     end

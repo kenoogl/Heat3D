@@ -355,7 +355,8 @@ function is_included_sph(a1, a2, center, radius; samples::Int=50)
 end
 
 # ジオメトリのbboxをフィル
-function FillPlate!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
+function FillPlate!(ID::Array{UInt8,3}, ox, Δh, Z::Vector{Float64}, mode)
+    SZ = size(ID)
     b = zeros(Float64, 3)
     L = zeros(Float64, 3)
     c1= zeros(Float64, 3)
@@ -393,7 +394,8 @@ end
 
 
 # 厚さ5µの領域
-function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode, lx=0.2e-3, ly=0.2e-3)
+function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, Z::Vector{Float64}, mode, lx=0.2e-3, ly=0.2e-3)
+    SZ = size(ID)
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     d1= zeros(Float64, 3)
@@ -426,7 +428,8 @@ function FillPowerGrid!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mod
 end 
 
 
-function FillResin!(ID::Array{UInt8,3}, SZ)
+function FillResin!(ID::Array{UInt8,3})
+    SZ = size(ID)
     for k in 1:SZ[3], j in 1:SZ[2], i in 1:SZ[1]
         if 0 == ID[i,j,k]
             ID[i,j,k] = Resin["id"]
@@ -435,7 +438,8 @@ function FillResin!(ID::Array{UInt8,3}, SZ)
 end
 
 
-function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
+function FillTSV!(ID::Array{UInt8,3}, ox, Δh, Z::Vector{Float64}, mode)
+    SZ = size(ID)
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
     cyl_ctr= zeros(Float64, 2)
@@ -467,7 +471,8 @@ function FillTSV!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
 end
 
 
-function FillSolder!(ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64}, mode)
+function FillSolder!(ID::Array{UInt8,3}, ox, Δh, Z::Vector{Float64}, mode)
+    SZ = size(ID)
     r = r_bump # ball radius
     c1= zeros(Float64, 3)
     c2= zeros(Float64, 3)
@@ -534,7 +539,8 @@ end
 
 
 # ここでλは温度拡散率
-function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{UInt8,3})
+function setLambda!(λ::Array{Float64,3}, ID::Array{UInt8,3})
+    SZ = size(λ)
     for k in 1:SZ[3], j in 1:SZ[2], i in 1:SZ[1]
         t = ID[i,j,k]
         if t == pwrsrc["id"]
@@ -556,17 +562,17 @@ function setLambda!(λ::Array{Float64,3}, SZ, ID::Array{UInt8,3})
 end
 
 
-function fillID!(mode, ID::Array{UInt8,3}, ox, Δh, SZ, Z::Vector{Float64})
+function fillID!(mode, ID::Array{UInt8,3}, ox, Δh, Z::Vector{Float64})
     println("FillPowerGrid")
-    FillPowerGrid!(ID, ox, Δh, SZ, Z, mode)
+    FillPowerGrid!(ID, ox, Δh, Z, mode)
     println("FillTSV")
-    FillTSV!(ID, ox, Δh, SZ, Z, mode)
+    FillTSV!(ID, ox, Δh, Z, mode)
     println("FillPlate")
-    FillPlate!(ID, ox, Δh, SZ, Z, mode)
+    FillPlate!(ID, ox, Δh, Z, mode)
     println("FillSolder")
-    FillSolder!(ID, ox, Δh, SZ, Z, mode)
+    FillSolder!(ID, ox, Δh, Z, mode)
     println("FillResin")
-    FillResin!(ID, SZ)
+    FillResin!(ID)
 end
 
 # @param mode (1--Uniform in Z-dir, 2--Non-uniform in Z), while Uniform for X&Y
@@ -596,7 +602,7 @@ function model_test(mode::Int64, NXY::Int64, NZ::Int64=13)
     end
     genZ!(mode, Z, SZ, ox, Δh[3])
 
-    @time fillID!(mode, ID, ox, Δh, SZ, Z)
+    @time fillID!(mode, ID, ox, Δh, Z)
 
 
     #plot_slice(ID, SZ, "id.png")
