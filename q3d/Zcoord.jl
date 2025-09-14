@@ -2,6 +2,7 @@ module Zcoordinate
 export Zcase1!, Zcase2!, Zcase3!, genZ!
 
 include("../model/modelA.jl")
+include("heat3d_NonUniform.jl")
 
 function Zcase1!(Z::Vector{Float64}, SZ)
     if SZ[3]!=15
@@ -107,7 +108,7 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz, mode)
         ΔZ[mz-1] = 0.5*ΔZ[mz-1]
     end
     #println(Z)
-    #println(ΔZ)
+    println(ΔZ)
 end
 
 end # end of module

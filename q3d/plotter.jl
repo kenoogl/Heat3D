@@ -94,6 +94,9 @@ function plot_slice_xz(region::Int, mode, d::Array{Float64,3}, Z, y, SZ, ox, Δh
     if min_val<=0.0
         min_val = 1.0e-5
     end
+    if max_val<=0.0
+        max_val = 1.0e-5
+    end
     log_min = log10(min_val)
     log_max = log10(max_val)
     log_ticks = range(log_min, log_max, length=n_ticks)
@@ -161,6 +164,9 @@ function plot_slice_xy(region, mode, d::Array{Float64,3}, zc, SZ, ox, Δh, Z, fn
     if min_val<=0.0
         min_val = 1.0e-5
     end
+    if max_val<=0.0
+        max_val = 1.0e-5
+    end
     log_min = log10(min_val)
     log_max = log10(max_val)
     log_ticks = range(log_min, log_max, length=n_ticks)
@@ -195,7 +201,7 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice_xz_nu(region::Int, mode, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
     xs::Int=1
     xe::Int=SZ[1]
     zs::Int=1
@@ -215,11 +221,16 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
     
     j = find_j(y, ox[2], Δh[2], SZ[2])
     s = d[xs:xe, j, zs:ze]
+
+    factor::Float64=0.0
+    if mode==2
+        factor = 1.0
+    else
+        factor = 1000.0
+    end
     
-    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
-    z_coords = [Z[k]*1000 for k in zs:ze]
-    #x_coords = [(ox[1] + Δh[1] * (i - 1.5)) for i in xs:xe]
-    #z_coords = [Z[k] for k in zs:ze]
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*factor for i in xs:xe]
+    z_coords = [Z[k]*factor for k in zs:ze]
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -230,6 +241,9 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
     if min_val<=0.0
         min_val = 1.0e-5
     end
+    if max_val<=0.0
+        max_val = 1.0e-5
+    end
     log_min = log10(min_val)
     log_max = log10(max_val)
     log_ticks = range(log_min, log_max, length=n_ticks)
@@ -239,8 +253,8 @@ function plot_slice_xz_nu(region, d::Array{Float64,3}, y, SZ, ox, Δh, Z::Vector
     p = contour(z_coords, x_coords, s, 
                 fill=true, 
                 c=:thermal, 
-                xlims=(0.0, 1.0),
-                ylims=(0.0, 1.0),
+                xlims= (mode==3) ? (0.0, 0.6) : (0.0, 1.2),
+                ylims=(0.0, 1.2),
                 colorbar_ticks=(auto_tick_values, auto_tick_labels),
                 #colorbar_title="Thermal Diffusion [m^2/s]",
                 xlabel="Z-coordinate [mm]", 
@@ -262,7 +276,7 @@ end
 @param [in] Z      Z方向格子点座標（NonUniform）
 @param [in] fname  ファイル名
 =#
-function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
+function plot_slice_xy_nu(region, mode, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vector{Float64}, fname, label::String="")
     xs::Int=1
     xe::Int=SZ[1]
     ys::Int=1
@@ -282,9 +296,15 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     
     k = find_k(Z, zc, SZ[3], 3)
     s = d[xs:xe, ys:ye, k]
-    
-    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*1000 for i in xs:xe]
-    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*1000 for j in ys:ye]
+
+    factor::Float64=0.0
+    if mode==2
+        factor = 1.0
+    else
+        factor = 1000.0
+    end
+    x_coords = [(ox[1] + Δh[1] * (i - 1.5))*factor for i in xs:xe]
+    y_coords = [(ox[2] + Δh[2] * (j - 1.5))*factor for j in ys:ye]
 
     min_val = minimum(s)
     max_val = maximum(s)
@@ -294,6 +314,9 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     # 対数スケールでティック値を計算
     if min_val<=0.0
         min_val = 1.0e-5
+    end
+    if max_val<=0.0
+        max_val = 1.0e-5
     end
     log_min = log10(min_val)
     log_max = log10(max_val)
@@ -305,14 +328,15 @@ function plot_slice_xy_nu(region, d::Array{Float64,3}, zc, SZ, ox, Δh, Z::Vecto
     p = contour(x_coords, y_coords, s, 
                 fill=true, 
                 c=:thermal, 
+                xlims=(0.0, 1.2),
+                ylims=(0.0, 1.2),
                 colorbar_ticks=(auto_tick_values, auto_tick_labels),
                 colorbar_title="Temperature [K]",
-                xlabel="X-coordinate", 
-                ylabel="Y-coordinate", 
+                xlabel="X-coordinate [mm]", 
+                ylabel="Y-coordinate [mm]", 
                 title=title_str, 
-                size=(800, 600),
+                size=(1000, 600),
                 aspect_ratio=:equal)
-     
     savefig(p, fname)
 end
 

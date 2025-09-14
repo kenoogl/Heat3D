@@ -4,7 +4,6 @@ using LinearAlgebra
 
 include("heat3d_Cartesian.jl")
 include("heat3d_NonUniform.jl")
-include("heat3d_NonUniformII.jl")
 include("../model/modelA.jl")
 include("plotter.jl")
 include("const.jl")
@@ -36,6 +35,25 @@ function set_mode1_bc_parameters()
 end
 
 """
+Mode2用の境界条件（Non-uniform格子の立方体問題）
+Z面に三角関数分布の等温条件、X,Y面は等温0K
+"""
+function set_mode2_bc_parameters()
+    # 各面の境界条件を定義
+    x_minus_bc = isothermal_bc(0.0)           # X軸負方向面: 等温0K
+    x_plus_bc  = isothermal_bc(0.0)           # X軸正方向面: 等温0K
+    y_minus_bc = isothermal_bc(0.0)           # Y軸負方向面: 等温0K
+    y_plus_bc  = isothermal_bc(0.0)           # Y軸正方向面: 等温0K
+    z_minus_bc = isothermal_bc(0.0)           # Z軸負方向面: 等温0K (後で三角関数分布で上書き)
+    z_plus_bc  = isothermal_bc(0.0)           # Z軸正方向面: 等温0K (後で三角関数分布で上書き)
+    
+    # 境界条件セットを作成
+    return create_boundary_conditions(x_minus_bc, x_plus_bc,
+                                      y_minus_bc, y_plus_bc,
+                                      z_minus_bc, z_plus_bc)
+end
+
+"""
 Mode3用の境界条件（NonUniform格子のIC問題）  
 Z下面: PCB温度、Z上面: 熱伝達、側面: 断熱
 """
@@ -43,12 +61,13 @@ function set_mode3_bc_parameters()
     θ_amb = 300.0 # [K]
     θ_pcb = 300.0 # [K]
     HT_top = 2.98e-4 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
+    HT_side = 2.98e-6 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     
     # 各面の境界条件を定義
-    x_minus_bc = adiabatic_bc()                        # X軸負方向面: 断熱
-    x_plus_bc  = adiabatic_bc()                        # X軸正方向面: 断熱
-    y_minus_bc = adiabatic_bc()                        # Y軸負方向面: 断熱
-    y_plus_bc  = adiabatic_bc()                        # Y軸正方向面: 断熱
+    x_minus_bc = convection_bc(HT_side, θ_amb)
+    x_plus_bc  = convection_bc(HT_side, θ_amb)
+    y_minus_bc = convection_bc(HT_side, θ_amb)  
+    y_plus_bc  = convection_bc(HT_side, θ_amb)
     z_minus_bc = isothermal_bc(θ_pcb)                  # Z軸負方向面: PCB温度
     z_plus_bc  = convection_bc(HT_top, θ_amb)          # Z軸正方向面: 熱伝達
     
@@ -82,11 +101,11 @@ function set_mode4_bc_parameters()
 end
 
 
-#=
+"""
 @brief 計算領域内部の熱源項の設定、ガイドセル部分は境界条件定数で利用
 @param [in,out] b    右辺項
 @param [in]     ID   識別子配列
-=#
+"""
 function HeatSrc!(b::Array{Float64,3}, ID::Array{UInt8,3})
     SZ = size(b)
     for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -96,12 +115,12 @@ function HeatSrc!(b::Array{Float64,3}, ID::Array{UInt8,3})
     end
 end
 
-#=
-@brief CUBE問題の境界条件
+"""
+@brief CUBE問題の境界条件 Cartesian
 @param [in,out] p    解ベクトル
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
-=#
+"""
 function bc_cube!(p::Array{Float64,3}, ox, Δh)
     SZ = size(p)
     for j in 2:SZ[2]-1, i in 2:SZ[1]-1
@@ -110,6 +129,23 @@ function bc_cube!(p::Array{Float64,3}, ox, Δh)
         a = sin(π*x)*sin(π*y)
         p[i,j,1    ] = a
         p[i,j,SZ[3]] = a
+    end
+end
+
+"""
+@brief CUBE問題の境界条件 NonUniform
+@param [in,out] p    解ベクトル
+@param [in]     SZ   配列長
+@param [in]     Δh   セル幅
+"""
+function bc_cube_nu!(p::Array{Float64,3}, ox, Δh)
+    SZ = size(p)
+    for j in 2:SZ[2]-1, i in 2:SZ[1]-1
+        x = ox[1] + Δh[1]*(i-1.5)
+        y = ox[2] + Δh[2]*(j-1.5)
+        a = sin(π*x)*sin(π*y)
+        p[i,j,2    ] = a
+        p[i,j,SZ[3]-1] = a
     end
 end
 
@@ -162,6 +198,7 @@ function writeSPH(size, org, pch, step, time, var)
      size, org, pch, step, time, var)
 end
 =#
+
 function dif(θ, exact)
     SZ = size(θ)
     d=0.0
@@ -172,12 +209,12 @@ function dif(θ, exact)
     return sqrt(d)
 end
 
-#= 
+"""
 @param [in] Δh       セル幅
 @param [in] θ        解ベクトル
-@param [in] solver   ["jacobi", "sor", "pbicgstab"]
-@param [in] smoother ["jacobi", "gs", ""]
-=#
+@param [in] solver   ["sor", "pbicgstab", "cg"]
+@param [in] smoother ["gs", ""]
+"""
 function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
     # 収束履歴の初期化
     conv_data = ConvergenceData(solver, smoother)
@@ -193,7 +230,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     HF[4] = bc_set.y_plus.heat_flux
     HF[5] = bc_set.z_minus.heat_flux
     HF[6] = bc_set.z_plus.heat_flux
-    println(HF)
+    #println(HF)
 
     HT[1] = bc_set.x_minus.heat_transfer_coefficient
     HT[2] = bc_set.x_plus.heat_transfer_coefficient
@@ -201,7 +238,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     HT[4] = bc_set.y_plus.heat_transfer_coefficient
     HT[5] = bc_set.z_minus.heat_transfer_coefficient
     HT[6] = bc_set.z_plus.heat_transfer_coefficient
-    println(HT)
+    #println(HT)
 
     if mode==3 || mode==4
         HeatSrc!(b, ID)
@@ -229,10 +266,8 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     if solver=="sor"
         if mode==1 || mode==4
             Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol, HF, HT)
-        elseif mode==2
-            NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol)
-        elseif mode==3
-            NonUniformII.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol)
+        elseif mode==2 || mode==3
+            NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol, HF, HT)
         end
     #=
     elseif solver=="jacobi"
@@ -250,26 +285,14 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
         if mode==1 || mode==4
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, ox, Δh, smoother, F, mode, itr_tol, HF, HT)
-        elseif mode==2
+        elseif mode==2 || mode==3
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol)
-        elseif mode==3
-            NonUniformII.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol)
+                pcg_s_, pcg_t_, λ, mask, 
+                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol, HF, HT)
         end
     elseif solver=="cg"
         if mode==1 || mode==4
             Cartesian.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, λ, mask, Δh, F, itr_tol, HF, HT)
-        elseif mode==2
-            NonUniform.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol)
-        elseif mode==3
-            NonUniformII.CG!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, wk, 
-                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol)
         end
     else
         println("solver error")
@@ -314,7 +337,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         return
     end
 
-    if mode==1
+    if mode==1 || mode==2
         if NXY != NZ
             println("NXY must be equal to NZ")
             return
@@ -359,7 +382,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     #plot_slice2(mask, SZ, "mask.png")
 
     if mode==3
-        plot_slice_xz_nu(1, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
+        plot_slice_xz_nu(1, mode, λ, 0.3e-3, SZ, ox, Δh, Z, "alpha3.png", "α")
     elseif mode==4
         plot_slice_xz(1, mode, λ, Z, 0.3e-3, SZ, ox, Δh, "alpha4.png", "α")
     end
@@ -373,7 +396,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         plot_slice_xz(1, mode, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
     elseif mode==2
         NonUniform.exact_solution!(exact, ox, Δh, Z)
-        plot_slice_xz_nu(1, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
+        plot_slice_xz_nu(1, mode, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
     # Boundary condition
@@ -402,9 +425,11 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
     θ .= θ_init # 初期温度設定
 
     print_boundary_conditions(bc_set)
-    apply_boundary_conditions!(θ, λ, mask, bc_set)
-    if mode==1 || mode==2
+    apply_boundary_conditions!(θ, λ, mask, bc_set, mode)
+    if mode==1
         bc_cube!(θ, ox, Δh) # Z方向の上下面の分布を上書き
+    elseif mode==2
+        bc_cube_nu!(θ, ox, Δh)
     end
 
     @time conv_data = main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
@@ -423,16 +448,16 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         plot_slice_xz(2, mode, abs.(θ-exact), Z, 0.5, SZ, ox, Δh, "diff.png", "diff")
         println(" L2 norm of θ-exact=",dif(θ, exact))
     elseif mode==2
-        plot_slice_xz_nu(2, θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
-        plot_slice_xz_nu(2, abs.(θ-exact), 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
+        plot_slice_xz_nu(2, mode, θ, 0.5, SZ, ox, Δh, Z, "p_nu.png", "solution")
+        plot_slice_xz_nu(2, mode, abs.(θ-exact), 0.5, SZ, ox, Δh, Z, "diff_nu.png", "diff")
         println(" L2 norm of θ-exact=",dif(θ, exact))
     elseif mode==3
-        plot_slice_xz_nu(2, θ, 0.3e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.3.png")
-        plot_slice_xz_nu(2, θ, 0.4e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.4.png")
-        plot_slice_xz_nu(2, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.5.png")
-        plot_slice_xy_nu(2, θ, 0.18e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
-        plot_slice_xy_nu(2, θ, 0.33e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
-        plot_slice_xy_nu(2, θ, 0.48e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
+        plot_slice_xz_nu(2, mode, θ, 0.3e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.3.png")
+        plot_slice_xz_nu(2, mode, θ, 0.4e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.4.png")
+        plot_slice_xz_nu(2, mode, θ, 0.5e-3, SZ, ox, Δh, Z, "temp3_xz_nu_y=0.5.png")
+        plot_slice_xy_nu(2, mode, θ, 0.18e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.18.png")
+        plot_slice_xy_nu(2, mode,θ, 0.33e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.33.png")
+        plot_slice_xy_nu(2, mode, θ, 0.48e-3, SZ, ox, Δh, Z, "temp3_xy_nu_z=0.48.png")
         plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.6e-3, 0.6e-3,"temp3Z_ctr", "Center")
         plot_line_z_nu(θ, SZ, ox, Δh, Z, 0.4e-3, 0.4e-3,"temp3Z_tsv", "TSV")
     else
@@ -484,16 +509,17 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-  #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
+  q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
   #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
   #q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
   #q3d(1, 25, 25, "cg", epsilon=1.0e-8)
   #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
+  #q3d(2, 25, 25, "sor", epsilon=1.0e-4)
   #q3d(4, 240, 120, "sor", epsilon=1.0e-4)
   #q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
-  q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
+  #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
 end
 #q3d(1, 25, 25, "pbicgstab")
 #q3d(2, 25, 25, "sor")

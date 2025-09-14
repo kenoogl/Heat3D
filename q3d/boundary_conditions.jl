@@ -93,26 +93,27 @@ end
 function apply_boundary_conditions!(θ::Array{Float64,3}, 
                                     λ::Array{Float64,3},
                                     mask::Array{Float64,3},
-                                    bc_set::BoundaryConditionSet)
+                                    bc_set::BoundaryConditionSet,
+                                    mode::Int64)
     SZ = size(θ)
     
     # X軸負方向面 (i=1)
-    apply_face_boundary!(θ, λ, mask, bc_set.x_minus, :x_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.x_minus, :x_minus, mode)
     
     # X軸正方向面 (i=SZ[1])
-    apply_face_boundary!(θ, λ, mask, bc_set.x_plus, :x_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.x_plus, :x_plus, mode)
     
     # Y軸負方向面 (j=1)
-    apply_face_boundary!(θ, λ, mask, bc_set.y_minus, :y_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.y_minus, :y_minus, mode)
     
     # Y軸正方向面 (j=SZ[2])
-    apply_face_boundary!(θ, λ, mask, bc_set.y_plus, :y_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.y_plus, :y_plus, mode)
     
     # Z軸負方向面 (k=1)
-    apply_face_boundary!(θ, λ, mask, bc_set.z_minus, :z_minus)
+    apply_face_boundary!(θ, λ, mask, bc_set.z_minus, :z_minus, mode)
     
     # Z軸正方向面 (k=SZ[3])
-    apply_face_boundary!(θ, λ, mask, bc_set.z_plus, :z_plus)
+    apply_face_boundary!(θ, λ, mask, bc_set.z_plus, :z_plus, mode)
 end
 
 """
@@ -127,11 +128,12 @@ function apply_face_boundary!(θ::Array{Float64,3},
                             λ::Array{Float64,3}, 
                             mask::Array{Float64,3}, 
                             bc::BoundaryCondition, 
-                            face_type::Symbol)
+                            face_type::Symbol,
+                            mode::Int64)
     
     if bc.type == ISOTHERMAL
         # 等温条件: mask=0, 温度固定
-        apply_isothermal!(θ, λ, mask, bc, face_type)
+        apply_isothermal!(θ, λ, mask, bc, face_type, mode)
         
     elseif bc.type == HEAT_FLUX
         # 熱流束条件: λを調整 (断熱条件の場合は λ=0)
@@ -150,7 +152,8 @@ function apply_isothermal!(θ::Array{Float64,3},
                         λ::Array{Float64,3}, 
                         mask::Array{Float64,3}, 
                         bc::BoundaryCondition, 
-                        face_type::Symbol)
+                        face_type::Symbol,
+                        mode::Int64)
     SZ = size(mask)
     temp = bc.temperature
 
@@ -182,13 +185,21 @@ function apply_isothermal!(θ::Array{Float64,3},
         for j in 1:SZ[2], i in 1:SZ[1]
             mask[i, j, 1] = 0.0
             λ[i, j, 1] = λ[i, j, 2]
-            θ[i, j, 1] = temp
+            if mode==1 || mode==4
+                θ[i, j, 1] = temp
+            else
+                θ[i, j, 2] = temp
+            end
         end
     elseif face_type == :z_plus
         for j in 1:SZ[2], i in 1:SZ[1]
             mask[i, j, SZ[3]] = 0.0
             λ[i, j, SZ[3]] = λ[i, j, SZ[3]-1]
-            θ[i, j, SZ[3]] = temp
+            if mode==1 || mode==4
+                θ[i, j, SZ[3]] = temp
+            else
+                θ[i, j, SZ[3]-1] = temp
+            end
         end
     end
 end
