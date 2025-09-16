@@ -121,9 +121,8 @@ function solveSOR!(θ, λ, b, mask, Δh, ω, Z, ΔZ,
 
     n = 0
     for n in 1:Constant.ItrMax
-        res = sor!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, HF, HT) / res0
-        #res = rbsor!(θ, SZ, λ, b, mask, Δh, ω, z_range, HF, HT) / res0
-        #println(n, " ", res)
+        #res = sor!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, HF, HT) / res0
+        res = rbsor!(θ, SZ, λ, b, mask, Δh, ω, z_range, HF, HT) / res0
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
         @printf(stdout, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
         if res < tol
@@ -217,7 +216,7 @@ end
 @param [in]     z_range Zループ開始/終了インデクス
 @param [in]     HF   熱流束境界の値
 @param [in]     HT   熱伝達境界の値
-@ret                 1セルあたりの残差RMS
+@ret                 セルあたりの残差RMS
 """
 function sor!(p::Array{Float64,3}, 
               λ::Array{Float64,3}, 
@@ -276,6 +275,120 @@ function sor!(p::Array{Float64,3},
     return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(z_ed-z_st+1))
 end
 
+
+"""
+@brief RB-SOR法のカーネル
+@param [in,out] p    解ベクトル
+@param [in]     λ    熱伝導率
+@param [in]     b    右辺ベクトル
+@param [in]     m    マスク配列
+@param [in]     Δh   セル幅
+@param [in]     ω    加速係数
+@param [in]     Z    Z座標
+@param [in]     ΔZ   格子幅
+@param [in]     z_range Zループ開始/終了インデクス
+@param [in]     HF   熱流束境界の値
+@param [in]     HT   熱伝達境界の値
+@param [in]     color R or B
+@ret                 残差2乗和
+"""
+function rbsor_core!(p::Array{Float64,3}, 
+                     λ::Array{Float64,3}, 
+                     b::Array{Float64,3},
+                     m::Array{Float64,3}, 
+                     Δh, 
+                     ω::Float64,
+                     Z::Vector{Float64},
+                    ΔZ::Vector{Float64},
+                    z_range::Vector{Int64},
+                    HF::Vector{Float64},
+                    HT::Vector{Float64},
+                    color::Int)
+    SZ = size(p)
+    res::Float64 = 0.0
+    dx0 = Δh[1]
+    dy0 = Δh[2]
+    dx2 = 1.0 / (dx0*dx0)
+    dy2 = 1.0 / (dy0*dy0)
+    dz2 = 1.0 / (dz0*dz0)
+    dx1 = 1.0 / dx0
+    dy1 = 1.0 / dy0
+    z_st = z_range[1]
+    z_ed = z_range[2]
+
+    for k in z_st:z_ed, j in 2:SZ[2]-1
+        @simd for i in 2+mod(k+j+color,2):2:SZ[1]-1
+            pp = p[i,j,k]
+            λ0 = λ[i,j,k]
+            m0 = m[i,j,k]
+            me = 1.0-m[i+1,j  ,k  ]
+            mw = 1.0-m[i-1,j  ,k  ]
+            mn = 1.0-m[i  ,j+1,k  ]
+            ms = 1.0-m[i  ,j-1,k  ]
+            mt = m[i  ,j  ,k+1]
+            mb = m[i  ,j  ,k-1]
+            bb = b[i,j,k]+( (mw*HF[1] - me*HF[2])*dx1
+                           +(ms*HF[3] - mn*HF[4])*dy1
+                           +((1.0-mb)*HF[5] - (1.0-m0)*HF[6])/ΔZ[k] ) # 熱流束境界
+            axm = λf(λ[i-1,j,k], λ0, m[i-1,j,k], m0) * dx2 + mw*dx1*HT[1]
+            axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
+            aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
+            ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
+            azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
+            azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
+            zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k] # 境界の半セル処理
+            zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
+            azm = (λ[i,j,k-1]/ (ΔZ[k]*zb))*mb + (1.0-mb)/ΔZ[k]*HT[5]
+            azp = (λ0        / (ΔZ[k]*zt))*mt + (1.0-mt)/ΔZ[k]*HT[6]
+            dd = (1.0-m0) + (axp + axm + ayp + aym + azp + azm)*m0
+            ss = ( axp * p[i+1,j  ,k  ] + axm * p[i-1,j  ,k  ]
+                 + ayp * p[i  ,j+1,k  ] + aym * p[i  ,j-1,k  ]
+                 + azp * p[i  ,j  ,k+1] + azm * p[i  ,j  ,k-1] )
+            dp = (((ss-bb)/dd - pp)) * m0
+            p[i,j,k] = pp + ω * dp
+            r = (dd + ω*(axm+aym+azm))*dp / ω
+            res += r*r
+        end
+    end
+
+    return res
+end
+
+"""
+@brief RB-SOR法
+@param [in,out] θ    解ベクトル
+@param [in]     λ    熱伝導率
+@param [in]     b    右辺ベクトル
+@param [in]     mask マスク配列
+@param [in]     Δh   セル幅
+@param [in]     ω    加速係数
+@param [in]     Z    Z座標
+@param [in]     ΔZ   格子幅
+@param [in]     z_range Zループ開始/終了インデクス
+@param [in]     HF   熱流束境界の値
+@param [in]     HT   熱伝達境界の値
+@ret                 セルあたりの残差RMS
+"""
+function rbsor!(p::Array{Float64,3}, 
+                λ::Array{Float64,3}, 
+                b::Array{Float64,3},
+                m::Array{Float64,3}, 
+                Δh, 
+                ω::Float64,
+                Z::Vector{Float64},
+               ΔZ::Vector{Float64},
+               z_range::Vector{Int64},
+               HF::Vector{Float64}, 
+               HT::Vector{Float64})
+    SZ = size(b)
+    res::Float64 = 0.0
+
+    # 2色のマルチカラー(Red&Black)のセットアップ
+    for c in 0:1
+        res += rbsor_core!(θ, λ, b, mask, Δh, ω, HF, HT, c)
+    end
+    return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
+end
 
 
 """
