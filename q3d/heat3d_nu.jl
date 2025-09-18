@@ -272,7 +272,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
         if mode==1 || mode==4
             Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol, HF, HT, par)
         elseif mode==2 || mode==3
-            NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol, HF, HT)
+            NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol, HF, HT, par)
         end
     elseif solver=="pbicgstab"
         if mode==1 || mode==4
@@ -281,7 +281,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
         elseif mode==2 || mode==3
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, 
-                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol, HF, HT)
+                ox, Δh, Z, ΔZ, z_range, smoother, F, mode, itr_tol, HF, HT, par)
         end
     elseif solver=="cg"
         if mode==1 || mode==4
@@ -403,7 +403,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int,
         Cartesian.exact_solution!(exact, ox, Δh, par)
         plot_slice_xz(1, mode, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
     elseif mode==2
-        NonUniform.exact_solution!(exact, ox, Δh, Z)
+        NonUniform.exact_solution!(exact, ox, Δh, Z, par)
         plot_slice_xz_nu(1, mode, exact, 0.5, SZ, ox, Δh, Z, "exact_nu.png", "Exact")
     end
     
@@ -527,10 +527,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
   #q3d(2, 25, 25, "sor", epsilon=1.0e-4, par="sequential")
   #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
 
-  #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
+  q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
   
   #q3d(4, 240, 120, "sor", epsilon=1.0e-4, par="sequential")
-  q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4, par="thread") 
+  #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4, par="thread") 
 end
 #q3d(1, 25, 25, "pbicgstab")

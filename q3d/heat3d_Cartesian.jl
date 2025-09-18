@@ -150,9 +150,9 @@ function sor!(p::Array{Float64,3},
               HF::Vector{Float64},
               HT::Vector{Float64}, 
               par::String)
-    backend = get_backend(par)
+
     SZ = size(p)
-    #res::Float64 = 0.0
+    res::Float64 = 0.0
     dx0 = Δh[1]
     dy0 = Δh[2]
     dz0 = Δh[3]
@@ -163,7 +163,7 @@ function sor!(p::Array{Float64,3},
     dy1 = 1.0 / dy0
     dz1 = 1.0 / dz0
 
-    @floop backend for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+    for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         pp = p[i,j,k]
         λ0 = λ[i,j,k]
         m0 = m[i,j,k]
@@ -189,7 +189,7 @@ function sor!(p::Array{Float64,3},
         dp = (((ss-bb)/dd - pp)) * m0
         p[i,j,k] = pp + ω * dp
         r = (dd + ω*(axm+aym+azm))*dp / ω
-        @reduce(res = 0.0 + r*r)
+        res += r*r
     end
 
     return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
