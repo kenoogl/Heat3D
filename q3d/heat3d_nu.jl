@@ -1,5 +1,7 @@
 using Printf
 using LinearAlgebra
+using FLoops
+using ThreadsX
 
 include("common.jl")
 include("heat3d_Cartesian.jl")
@@ -103,9 +105,11 @@ end
 @param [in,out] b    右辺項
 @param [in]     ID   識別子配列
 """
-function HeatSrc!(b::Array{Float64,3}, ID::Array{UInt8,3})
+function HeatSrc!(b::Array{Float64,3}, ID::Array{UInt8,3}, par)
+    backend = get_backend(par)
     SZ = size(b)
-    for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
+    
+    @floop backend for k in 2:SZ[3]-1, j in 2:SZ[2]-1, i in 2:SZ[1]-1
         if ID[i,j,k] == modelA.pwrsrc["id"]
             b[i,j,k] = -Constant.Q_src
         end
@@ -118,9 +122,11 @@ end
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 """
-function bc_cube!(p::Array{Float64,3}, ox, Δh)
+function bc_cube!(p::Array{Float64,3}, ox, Δh, par)
+    backend = get_backend(par)
     SZ = size(p)
-    for j in 2:SZ[2]-1, i in 2:SZ[1]-1
+
+    @floop backend for j in 2:SZ[2]-1, i in 2:SZ[1]-1
         x = ox[1] + Δh[1]*(i-1.5)
         y = ox[2] + Δh[2]*(j-1.5)
         a = sin(π*x)*sin(π*y)
@@ -135,9 +141,11 @@ end
 @param [in]     SZ   配列長
 @param [in]     Δh   セル幅
 """
-function bc_cube_nu!(p::Array{Float64,3}, ox, Δh)
+function bc_cube_nu!(p::Array{Float64,3}, ox, Δh, par)
+    backend = get_backend(par)
     SZ = size(p)
-    for j in 2:SZ[2]-1, i in 2:SZ[1]-1
+    
+    @floop backend for j in 2:SZ[2]-1, i in 2:SZ[1]-1
         x = ox[1] + Δh[1]*(i-1.5)
         y = ox[2] + Δh[2]*(j-1.5)
         a = sin(π*x)*sin(π*y)
@@ -212,7 +220,7 @@ end
 @param [in] solver   ["sor", "pbicgstab", "cg"]
 @param [in] smoother ["gs", ""]
 """
-function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
+function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set, par)
     # 収束履歴の初期化
     conv_data = ConvergenceData(solver, smoother)
 
@@ -238,7 +246,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
     #println(HT)
 
     if mode==3 || mode==4
-        HeatSrc!(b, ID)
+        HeatSrc!(b, ID, par)
     end
 
     if solver=="pbicgstab"
@@ -262,26 +270,14 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
 
     if solver=="sor"
         if mode==1 || mode==4
-            Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol, HF, HT)
+            Cartesian.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, F, itr_tol, HF, HT, par)
         elseif mode==2 || mode==3
             NonUniform.solveSOR!(θ, λ, b, mask, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol, HF, HT)
         end
-    #=
-    elseif solver=="jacobi"
-        if mode==1
-            Cartesian.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
-        elseif mode==2
-            NonUniform.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol)
-        elseif mode==3
-            NonUniformII.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, Z, ΔZ, z_range, F, itr_tol)
-        elseif mode==4
-            Cartesian.solveJACOBI!(θ, λ, b, mask, wk, Δh, Constant.ω, F, itr_tol)
-        end
-    =#
     elseif solver=="pbicgstab"
         if mode==1 || mode==4
             Cartesian.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
-                pcg_s_, pcg_t_, λ, mask, ox, Δh, smoother, F, mode, itr_tol, HF, HT)
+                pcg_s_, pcg_t_, λ, mask, ox, Δh, smoother, F, mode, itr_tol, HF, HT, par)
         elseif mode==2 || mode==3
             NonUniform.PBiCGSTAB!(θ, b, pcg_q, pcg_r, pcg_r0, pcg_p, pcg_p_, pcg_s, 
                 pcg_s_, pcg_t_, λ, mask, 
@@ -289,7 +285,7 @@ function main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, b
         end
     elseif solver=="cg"
         if mode==1 || mode==4
-            Cartesian.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, λ, mask, Δh, F, itr_tol, HF, HT)
+            Cartesian.CG!(θ, b, cg_p, cg_r, cg_ax, cg_ap, λ, mask, Δh, F, itr_tol, HF, HT, par)
         end
     else
         println("solver error")
@@ -324,9 +320,22 @@ end
 =#
 function q3d(m_mode::Int, NXY::Int, NZ::Int, 
          solver::String="sor", smoother::String=""; 
-         epsilon::Float64=1.0e-6)
+         epsilon::Float64=1.0e-6, par::String="thread")
     global mode = m_mode
     global itr_tol = epsilon
+
+    println("Julia version: $(VERSION)")
+    
+    if par=="sequential"
+        println("Sequential execution")
+    elseif par=="thread"
+        println("Available num. of threads: ", Threads.nthreads())
+    else
+        println("Invalid paralle mode")
+        exit()
+    end
+
+    println("="^60)
 
     MX = MY = NXY + 2  # Number of CVs including boundaries
     MZ = NZ + 2
@@ -391,7 +400,7 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int,
     end 
 
     if mode==1
-        Cartesian.exact_solution!(exact, ox, Δh)
+        Cartesian.exact_solution!(exact, ox, Δh, par)
         plot_slice_xz(1, mode, exact, Z, 0.5, SZ, ox, Δh, "exact.png", "Exact")
     elseif mode==2
         NonUniform.exact_solution!(exact, ox, Δh, Z)
@@ -426,12 +435,12 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int,
     BoundaryConditions.print_boundary_conditions(bc_set)
     BoundaryConditions.apply_boundary_conditions!(θ, λ, mask, bc_set, mode)
     if mode==1
-        bc_cube!(θ, ox, Δh) # Z方向の上下面の分布を上書き
+        bc_cube!(θ, ox, Δh, par) # Z方向の上下面の分布を上書き
     elseif mode==2
-        bc_cube_nu!(θ, ox, Δh)
+        bc_cube_nu!(θ, ox, Δh, par)
     end
 
-    tm = @elapsed conv_data = main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
+    tm = @elapsed conv_data = main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set, par)
 
     
     if mode==1 || mode==2
@@ -506,27 +515,22 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int,
     end
 
     println(tm, "[sec]")
+    println(" ")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-  #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
-  q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
-  #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4)
-  #q3d(1, 25, 25, "cg", epsilon=1.0e-4)
+  #q3d(1, 25, 25, "sor", epsilon=1.0e-4, par="thread")
+  #q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4, par="sequential")
+  #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4, par="thread")
+  #q3d(1, 25, 25, "cg", epsilon=1.0e-4, par="thread")
 
-  #q3d(2, 25, 25, "sor", epsilon=1.0e-4)
-  q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4)
+  #q3d(2, 25, 25, "sor", epsilon=1.0e-4, par="sequential")
+  #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
 
-  q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
-  #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
+  #q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
+  #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4, par="sequential")
   
-  #q3d(4, 240, 120, "sor", epsilon=1.0e-4)
-  #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
+  #q3d(4, 240, 120, "sor", epsilon=1.0e-4, par="sequential")
+  q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4, par="thread") 
 end
 #q3d(1, 25, 25, "pbicgstab")
-#q3d(2, 25, 25, "sor")
-#q3d(3, 240, 121, "pbicgstab", "gs")
-#q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4)
-#q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
-#q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
-#q3d(1, 25, 25, "cg")
