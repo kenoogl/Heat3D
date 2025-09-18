@@ -1,18 +1,15 @@
 using Printf
-using Random
 using LinearAlgebra
 
+include("common.jl")
 include("heat3d_Cartesian.jl")
 include("heat3d_NonUniform.jl")
 include("../model/modelA.jl")
 include("plotter.jl")
-include("const.jl")
 include("convergence_history.jl")
 include("parse_log_residuals.jl")
 include("boundary_conditions.jl")
 include("Zcoord.jl")
-using .BoundaryConditions
-using .Zcoordinate
 
 
 """
@@ -21,15 +18,15 @@ Z面に三角関数分布の等温条件、X,Y面は等温0K
 """
 function set_mode1_bc_parameters()
     # 各面の境界条件を定義
-    x_minus_bc = isothermal_bc(0.0)           # X軸負方向面: 等温0K
-    x_plus_bc  = isothermal_bc(0.0)           # X軸正方向面: 等温0K
-    y_minus_bc = isothermal_bc(0.0)           # Y軸負方向面: 等温0K
-    y_plus_bc  = isothermal_bc(0.0)           # Y軸正方向面: 等温0K
-    z_minus_bc = isothermal_bc(0.0)           # Z軸負方向面: 等温0K (後で三角関数分布で上書き)
-    z_plus_bc  = isothermal_bc(0.0)           # Z軸正方向面: 等温0K (後で三角関数分布で上書き)
+    x_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # X軸負方向面: 等温0K
+    x_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # X軸正方向面: 等温0K
+    y_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # Y軸負方向面: 等温0K
+    y_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # Y軸正方向面: 等温0K
+    z_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # Z軸負方向面: 等温0K (後で三角関数分布で上書き)
+    z_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # Z軸正方向面: 等温0K (後で三角関数分布で上書き)
     
     # 境界条件セットを作成
-    return create_boundary_conditions(x_minus_bc, x_plus_bc,
+    return BoundaryConditions.create_boundary_conditions(x_minus_bc, x_plus_bc,
                                       y_minus_bc, y_plus_bc,
                                       z_minus_bc, z_plus_bc)
 end
@@ -40,15 +37,15 @@ Z面に三角関数分布の等温条件、X,Y面は等温0K
 """
 function set_mode2_bc_parameters()
     # 各面の境界条件を定義
-    x_minus_bc = isothermal_bc(0.0)           # X軸負方向面: 等温0K
-    x_plus_bc  = isothermal_bc(0.0)           # X軸正方向面: 等温0K
-    y_minus_bc = isothermal_bc(0.0)           # Y軸負方向面: 等温0K
-    y_plus_bc  = isothermal_bc(0.0)           # Y軸正方向面: 等温0K
-    z_minus_bc = isothermal_bc(0.0)           # Z軸負方向面: 等温0K (後で三角関数分布で上書き)
-    z_plus_bc  = isothermal_bc(0.0)           # Z軸正方向面: 等温0K (後で三角関数分布で上書き)
+    x_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # X軸負方向面: 等温0K
+    x_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # X軸正方向面: 等温0K
+    y_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # Y軸負方向面: 等温0K
+    y_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # Y軸正方向面: 等温0K
+    z_minus_bc = BoundaryConditions.isothermal_bc(0.0)           # Z軸負方向面: 等温0K (後で三角関数分布で上書き)
+    z_plus_bc  = BoundaryConditions.isothermal_bc(0.0)           # Z軸正方向面: 等温0K (後で三角関数分布で上書き)
     
     # 境界条件セットを作成
-    return create_boundary_conditions(x_minus_bc, x_plus_bc,
+    return BoundaryConditions.create_boundary_conditions(x_minus_bc, x_plus_bc,
                                       y_minus_bc, y_plus_bc,
                                       z_minus_bc, z_plus_bc)
 end
@@ -64,15 +61,15 @@ function set_mode3_bc_parameters()
     HT_side = 2.98e-6 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     
     # 各面の境界条件を定義
-    x_minus_bc = convection_bc(HT_side, θ_amb)
-    x_plus_bc  = convection_bc(HT_side, θ_amb)
-    y_minus_bc = convection_bc(HT_side, θ_amb)  
-    y_plus_bc  = convection_bc(HT_side, θ_amb)
-    z_minus_bc = isothermal_bc(θ_pcb)                  # Z軸負方向面: PCB温度
-    z_plus_bc  = convection_bc(HT_top, θ_amb)          # Z軸正方向面: 熱伝達
+    x_minus_bc = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    x_plus_bc  = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    y_minus_bc = BoundaryConditions.convection_bc(HT_side, θ_amb)  
+    y_plus_bc  = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    z_minus_bc = BoundaryConditions.isothermal_bc(θ_pcb)                  # Z軸負方向面: PCB温度
+    z_plus_bc  = BoundaryConditions.convection_bc(HT_top, θ_amb)          # Z軸正方向面: 熱伝達
     
     # 境界条件セットを作成
-    return create_boundary_conditions(x_minus_bc, x_plus_bc,
+    return BoundaryConditions.create_boundary_conditions(x_minus_bc, x_plus_bc,
                                       y_minus_bc, y_plus_bc,
                                       z_minus_bc, z_plus_bc)
 end
@@ -87,15 +84,15 @@ function set_mode4_bc_parameters()
     HT_top = 2.98e-4 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     HT_side = 2.98e-6 # 5 [W/(m^2 K)] / (\rho C)_silicon > [m/s]
     # 各面の境界条件を定義
-    x_minus_bc = convection_bc(HT_side, θ_amb)
-    x_plus_bc  = convection_bc(HT_side, θ_amb)
-    y_minus_bc = convection_bc(HT_side, θ_amb)  
-    y_plus_bc  = convection_bc(HT_side, θ_amb)
-    z_minus_bc = isothermal_bc(θ_pcb)         # Z軸負方向面: PCB温度
-    z_plus_bc  = convection_bc(HT_top, θ_amb)
+    x_minus_bc = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    x_plus_bc  = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    y_minus_bc = BoundaryConditions.convection_bc(HT_side, θ_amb)  
+    y_plus_bc  = BoundaryConditions.convection_bc(HT_side, θ_amb)
+    z_minus_bc = BoundaryConditions.isothermal_bc(θ_pcb)         # Z軸負方向面: PCB温度
+    z_plus_bc  = BoundaryConditions.convection_bc(HT_top, θ_amb)
     
     # 境界条件セットを作成
-    return create_boundary_conditions(x_minus_bc, x_plus_bc,
+    return BoundaryConditions.create_boundary_conditions(x_minus_bc, x_plus_bc,
                                       y_minus_bc, y_plus_bc,
                                       z_minus_bc, z_plus_bc)
 end
@@ -177,7 +174,7 @@ end
 """
 function preprocess!(λ, Z, ΔZ, ox, Δh, ID)
     SZ = size(λ)
-    genZ!(Z, ΔZ, SZ, ox, Δh[3], mode)
+    Zcoordinate.genZ!(Z, ΔZ, SZ, ox, Δh[3], mode)
 
     if mode==3 || mode==4
         modelA.fillID!(mode, ID, ox, Δh, Z)
@@ -325,7 +322,9 @@ end
 @param [in] solver    ["jacobi", "sor", "pbicgstab"]
 @param [in] smoother  ["jacobi", "gs", ""]
 =#
-function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::String=""; epsilon::Float64=1.0e-6)
+function q3d(m_mode::Int, NXY::Int, NZ::Int, 
+         solver::String="sor", smoother::String=""; 
+         epsilon::Float64=1.0e-6)
     global mode = m_mode
     global itr_tol = epsilon
 
@@ -424,15 +423,15 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
 
     θ .= θ_init # 初期温度設定
 
-    print_boundary_conditions(bc_set)
-    apply_boundary_conditions!(θ, λ, mask, bc_set, mode)
+    BoundaryConditions.print_boundary_conditions(bc_set)
+    BoundaryConditions.apply_boundary_conditions!(θ, λ, mask, bc_set, mode)
     if mode==1
         bc_cube!(θ, ox, Δh) # Z方向の上下面の分布を上書き
     elseif mode==2
         bc_cube_nu!(θ, ox, Δh)
     end
 
-    @time conv_data = main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
+    tm = @elapsed conv_data = main(ox, Δh, θ, b, mask, Z, ΔZ, ID, λ, solver, smoother, z_range, bc_set)
 
     
     if mode==1 || mode==2
@@ -506,19 +505,22 @@ function q3d(m_mode::Int, NXY::Int, NZ::Int, solver::String="sor", smoother::Str
         end
     end
 
+    println(tm, "[sec]")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
+  #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
+  q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
+  #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4)
+  #q3d(1, 25, 25, "cg", epsilon=1.0e-4)
+
+  #q3d(2, 25, 25, "sor", epsilon=1.0e-4)
+  q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-4)
+
   q3d(3, 240, 31, "pbicgstab", "gs", epsilon=1.0e-4)
   #q3d(3, 120, 31, "pbicgstab", "gs", epsilon=1.0e-4)
-  #q3d(1, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
-  #q3d(1, 25, 25, "sor", epsilon=1.0e-4)
-  #q3d(1, 25, 25, "pbicgstab", epsilon=1.0e-4)
-  #q3d(1, 25, 25, "cg", epsilon=1.0e-8)
-  #q3d(2, 25, 25, "pbicgstab", "gs", epsilon=1.0e-8)
-  #q3d(2, 25, 25, "sor", epsilon=1.0e-4)
+  
   #q3d(4, 240, 120, "sor", epsilon=1.0e-4)
-  #q3d(4, 240, 120, "cg", epsilon=1.0e-4) 
   #q3d(4, 240, 120, "pbicgstab", "gs", epsilon=1.0e-4) 
 end
 #q3d(1, 25, 25, "pbicgstab")

@@ -3,16 +3,8 @@ export exact_solution!, solveSOR!, PBiCGSTAB!, CG!
 
 using Printf
 
-include("const.jl")
+include("common.jl")
 
-"""
-Harmonic mean
-@param a left value
-@param b right value
-@param ma mask for left
-@param mb mask for right
-"""
-λf(a, b, ma, mb) = 2.0*a*b / (a+b) * (2.0-div(ma+mb,2))
 
 """
 @brief 厳密解

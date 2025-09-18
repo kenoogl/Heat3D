@@ -2,7 +2,65 @@ module Zcoordinate
 export Zcase1!, Zcase2!, Zcase3!, genZ!
 
 include("../model/modelA.jl")
-include("heat3d_NonUniform.jl")
+using Printf
+
+"""
+    read_grid_file(filename)
+
+ASCIIファイルから格子点座標を読み込む
+
+# Arguments
+- `filename::String`: 入力ファイル名
+
+# Returns
+- `coord::Vector{Float64}`: 格子点座標配列
+- `numNodes::Int`: 格子点数
+"""
+function read_grid_file(filename::String="grid.txt")
+  if !isfile(filename)
+    error("ファイルが見つかりません: $filename")
+  end
+  
+  coord = Float64[]
+  numNodes = 0
+  
+  open(filename, "r") do f
+    # 1行目: 格子点数を読み込み
+    line = readline(f)
+    numNodes = parse(Int, strip(line))
+    
+    # 座標配列を初期化
+    coord = zeros(Float64, numNodes)
+    
+    # 格子点データを読み込み
+    for i in 1:numNodes
+      line = readline(f)
+      parts = split(strip(line))
+      
+      if length(parts) != 2
+        error("ファイル形式エラー（行$(i+1)）: $line")
+      end
+      
+      grid_index = parse(Int, parts[1])
+      grid_coord = parse(Float64, parts[2])
+      
+      # 格子点番号の整合性チェック（1オリジン）
+      if grid_index != i
+        @warn "格子点番号が期待値と異なります: 期待値=$i, 実際値=$grid_index"
+      end
+      
+      coord[i] = grid_coord
+    end
+  end
+    
+  println("格子点データ読み込み完了:")
+  @printf("  ファイル: %s\n", filename)
+  @printf("  格子点数: %d\n", numNodes)
+  @printf("  座標範囲: [%.6f, %.6f]\n", minimum(coord), maximum(coord))
+  
+  return coord, numNodes
+end
+
 
 function Zcase1!(Z::Vector{Float64}, SZ)
     if SZ[3]!=15
@@ -83,7 +141,7 @@ function genZ!(Z::Vector{Float64}, ΔZ::Vector{Float64}, SZ, ox, dz, mode)
             Z[k] = ox[3] + (k-2)*dz
         end
     elseif mode==2
-        read_coord, numNodes = NonUniform.read_grid_file()
+        read_coord, numNodes = read_grid_file()
         if numNodes != mz-2
             println("Number of genereted grid is not match with parameter NZ")
             exit(0)

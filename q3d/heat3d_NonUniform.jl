@@ -1,75 +1,10 @@
 module NonUniform
-export exact_solution!, read_grid_file, solveSOR!, PBiCGSTAB!
+export exact_solution!, solveSOR!, PBiCGSTAB!
 
 using Printf
 
-include("const.jl")
+include("common.jl")
 
-"""
-Harmonic mean
-@param a left value
-@param b right value
-@param ma mask for left
-@param mb mask for right
-"""
-λf(a, b, ma, mb) = 2.0*a*b / (a+b) * (2.0-div(ma+mb,2))
-
-"""
-    read_grid_file(filename)
-
-ASCIIファイルから格子点座標を読み込む
-
-# Arguments
-- `filename::String`: 入力ファイル名
-
-# Returns
-- `coord::Vector{Float64}`: 格子点座標配列
-- `numNodes::Int`: 格子点数
-"""
-function read_grid_file(filename::String="grid.txt")
-  if !isfile(filename)
-    error("ファイルが見つかりません: $filename")
-  end
-  
-  coord = Float64[]
-  numNodes = 0
-  
-  open(filename, "r") do f
-    # 1行目: 格子点数を読み込み
-    line = readline(f)
-    numNodes = parse(Int, strip(line))
-    
-    # 座標配列を初期化
-    coord = zeros(Float64, numNodes)
-    
-    # 格子点データを読み込み
-    for i in 1:numNodes
-      line = readline(f)
-      parts = split(strip(line))
-      
-      if length(parts) != 2
-        error("ファイル形式エラー（行$(i+1)）: $line")
-      end
-      
-      grid_index = parse(Int, parts[1])
-      grid_coord = parse(Float64, parts[2])
-      
-      # 格子点番号の整合性チェック（1オリジン）
-      if grid_index != i
-        @warn "格子点番号が期待値と異なります: 期待値=$i, 実際値=$grid_index"
-      end
-      
-      coord[i] = grid_coord
-    end
-  end
-  
-  println("格子点データ読み込み完了:")
-  @printf("  ファイル: %s\n", filename)
-  @printf("  格子点数: %d\n", numNodes)
-  @printf("  座標範囲: [%.6f, %.6f]\n", minimum(coord), maximum(coord))
-  
-  return coord, numNodes
-end
 
 """
 @brief 厳密解
@@ -122,7 +57,7 @@ function solveSOR!(θ, λ, b, mask, Δh, ω, Z, ΔZ,
     n = 0
     for n in 1:Constant.ItrMax
         #res = sor!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, HF, HT) / res0
-        res = rbsor!(θ, SZ, λ, b, mask, Δh, ω, z_range, HF, HT) / res0
+        res = rbsor!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, HF, HT) / res0
         @printf(F, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
         @printf(stdout, "%10d %24.14E\n", n, res) # 時間計測の場合にはコメントアウト
         if res < tol
@@ -310,7 +245,6 @@ function rbsor_core!(p::Array{Float64,3},
     dy0 = Δh[2]
     dx2 = 1.0 / (dx0*dx0)
     dy2 = 1.0 / (dy0*dy0)
-    dz2 = 1.0 / (dz0*dz0)
     dx1 = 1.0 / dx0
     dy1 = 1.0 / dy0
     z_st = z_range[1]
@@ -334,8 +268,6 @@ function rbsor_core!(p::Array{Float64,3},
             axp = λf(λ[i+1,j,k], λ0, m[i+1,j,k], m0) * dx2 + me*dx1*HT[2]
             aym = λf(λ[i,j-1,k], λ0, m[i,j-1,k], m0) * dy2 + ms*dy1*HT[3]
             ayp = λf(λ[i,j+1,k], λ0, m[i,j+1,k], m0) * dy2 + mn*dy1*HT[4]
-            azm = λf(λ[i,j,k-1], λ0, m[i,j,k-1], m0) * dz2 + mb*dz1*HT[5]
-            azp = λf(λ[i,j,k+1], λ0, m[i,j,k+1], m0) * dz2 + mt*dz1*HT[6]
             zb = (Z[k]-Z[k-1])*mb + (1.0-mb)*ΔZ[k] # 境界の半セル処理
             zt = (Z[k+1]-Z[k])*m0 + (1.0-m0)*ΔZ[k]
             azm = (λ[i,j,k-1]/ (ΔZ[k]*zb))*mb + (1.0-mb)/ΔZ[k]*HT[5]
@@ -369,10 +301,10 @@ end
 @param [in]     HT   熱伝達境界の値
 @ret                 セルあたりの残差RMS
 """
-function rbsor!(p::Array{Float64,3}, 
+function rbsor!(θ::Array{Float64,3}, 
                 λ::Array{Float64,3}, 
                 b::Array{Float64,3},
-                m::Array{Float64,3}, 
+                mask::Array{Float64,3}, 
                 Δh, 
                 ω::Float64,
                 Z::Vector{Float64},
@@ -385,7 +317,7 @@ function rbsor!(p::Array{Float64,3},
 
     # 2色のマルチカラー(Red&Black)のセットアップ
     for c in 0:1
-        res += rbsor_core!(θ, λ, b, mask, Δh, ω, HF, HT, c)
+        res += rbsor_core!(θ, λ, b, mask, Δh, ω, Z, ΔZ, z_range, HF, HT, c)
     end
     return sqrt(res)/((SZ[1]-2)*(SZ[2]-2)*(SZ[3]-2))
 end
